@@ -1,130 +1,137 @@
-# Setup NestJS CQRS - Documentation
+# setup-nestjs-cqrs.sh
 
-## Description
-
-Script d'installation automatique des dependances et de la structure de dossiers pour un projet NestJS suivant le pattern CQRS et les conventions 41DEVS.
-
-## Emplacement
-
-```
-scripts/setup-nestjs-cqrs.sh
-```
+Script d'installation automatique pour projets NestJS avec CQRS (41DEVS Standard).
 
 ## Usage
 
 ```bash
-# 1. Creer d'abord le projet NestJS
-nest new mon-projet
-cd mon-projet
+# Creer un nouveau projet dans un dossier
+setup-nestjs-cqrs.sh mon-api
 
-# 2. Copier le script dans le projet ou l'executer depuis le chemin
-../scripts/setup-nestjs-cqrs.sh
+# Initialiser dans le dossier actuel
+setup-nestjs-cqrs.sh .
+
+# Mode interactif (demande le nom)
+setup-nestjs-cqrs.sh
+
+# Afficher l'aide
+setup-nestjs-cqrs.sh --help
 ```
 
-## Ce que le script installe
+## Structure generee
 
-### Dependances de Production
+```
+mon-api/
+├── src/
+│   ├── main.ts                # Point d'entree avec Swagger
+│   ├── app.module.ts          # Module racine
+│   ├── app.controller.ts      # Controller de base
+│   ├── app.service.ts         # Service de base
+│   ├── app.controller.spec.ts # Test unitaire
+│   ├── config/
+│   ├── common/
+│   │   ├── decorators/
+│   │   ├── guards/
+│   │   ├── interceptors/
+│   │   ├── filters/
+│   │   ├── pipes/
+│   │   ├── middlewares/
+│   │   ├── interfaces/
+│   │   ├── enums/
+│   │   └── utils/
+│   ├── shared/
+│   │   ├── email/
+│   │   ├── sms/
+│   │   ├── storage/
+│   │   └── notification/
+│   └── health/                # Module exemple CQRS
+│       ├── health.module.ts
+│       ├── health.controller.ts
+│       └── queries/
+│           ├── get-health.query.ts
+│           └── get-health.query.handler.ts
+├── config/
+├── settings/
+├── test/
+├── docs/adr/
+├── http/
+├── .env
+├── .env.example
+├── .gitignore
+├── .prettierrc
+├── tsconfig.json
+└── nest-cli.json
+```
 
+## Dependances installees
+
+### Production
 | Package | Description |
 |---------|-------------|
-| `@nestjs/common`, `@nestjs/core` | Core NestJS |
-| `@nestjs/cqrs` | Module CQRS |
-| `@nestjs/typeorm`, `typeorm`, `pg` | ORM + PostgreSQL |
-| `@nestjs/config`, `dotenv` | Configuration |
-| `class-validator`, `class-transformer` | Validation DTOs |
-| `@nestjs/mapped-types` | PartialType, PickType |
-| `@nestjs/jwt`, `@nestjs/passport`, `passport-jwt` | Authentification |
-| `bcrypt` | Hashage mots de passe |
-| `@nestjs/swagger` | Documentation API |
-| `nest-winston`, `winston` | Logging avance |
-| `@automapper/*` | Mapping objets |
+| @nestjs/common, core, platform-express | Core NestJS |
+| @nestjs/cqrs | Pattern CQRS |
+| @nestjs/typeorm, typeorm, pg | PostgreSQL |
+| @nestjs/config, dotenv | Configuration |
+| class-validator, class-transformer | Validation DTOs |
+| @nestjs/jwt, passport, bcrypt | Authentification |
+| @nestjs/swagger, swagger-ui-express | Documentation API |
+| nest-winston, winston | Logging |
+| uuid, rxjs, reflect-metadata | Utilitaires |
 
-### Dependances de Developpement
-
+### Developpement
 | Package | Description |
 |---------|-------------|
-| `typescript`, `ts-node` | TypeScript |
-| `@types/*` | Types TypeScript |
-| `jest`, `@nestjs/testing` | Tests |
-| `eslint`, `prettier` | Linting et formatting |
+| typescript, ts-node | TypeScript |
+| jest, ts-jest | Tests |
+| eslint, prettier | Linting/Formatting |
+| @nestjs/cli | CLI NestJS |
 
-### Structure de Dossiers Creee
+## Fichiers configures
 
-```
-src/
-├── config/              # Configuration applicative
-├── common/
-│   ├── decorators/      # Decorateurs personnalises
-│   ├── guards/          # Guards d'authentification
-│   ├── interceptors/    # Intercepteurs
-│   ├── filters/         # Filtres d'exceptions
-│   ├── pipes/           # Pipes de validation
-│   ├── middlewares/     # Middlewares
-│   ├── interfaces/      # Interfaces partagees
-│   ├── enums/           # Enumerations
-│   └── utils/           # Utilitaires
-├── shared/
-│   ├── email/           # Service email
-│   ├── sms/             # Service SMS
-│   ├── storage/         # Service stockage
-│   └── notification/    # Notifications
-config/
-├── default.json         # Config par defaut
-├── development.json     # Config developpement
-└── production.json      # Config production
-settings/
-└── typeorm.config.ts    # Config TypeORM pour migrations
-docs/
-└── adr/                 # Architecture Decision Records
+- **`.env`** : Variables PostgreSQL, JWT, etc.
+- **`tsconfig.json`** : Optimise pour NestJS
+- **`nest-cli.json`** : Configuration CLI
+- **`.prettierrc`** : Regles 41DEVS
+- **`.gitignore`** : Ignore node_modules, dist, .env
+
+## Module exemple: Health
+
+Le script cree un module `health` qui demontre le pattern CQRS :
+
+```typescript
+// GET /api/health
+{
+  "status": "ok",
+  "timestamp": "2026-02-02T18:00:00.000Z",
+  "uptime": 123.456,
+  "message": "API NestJS CQRS - 41DEVS Standard"
+}
 ```
 
-### Fichiers de Configuration Crees
+## Apres l'installation
 
-| Fichier | Description |
-|---------|-------------|
-| `.env.example` | Template des variables d'environnement |
-| `.env` | Variables d'environnement (copie de example) |
-| `config/default.json` | Configuration par defaut |
-| `config/development.json` | Configuration dev |
-| `config/production.json` | Configuration prod |
-| `settings/typeorm.config.ts` | Configuration TypeORM |
-| `.prettierrc` | Configuration Prettier |
-
-## Variables d'Environnement
-
-```env
-# Application
-NODE_ENV=development
-PORT=3000
-API_PREFIX=api
-
-# Base de donnees PostgreSQL
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=root
-DATABASE_PASSWORD=root
-DATABASE_NAME=cqrs_learning
-
-# JWT
-JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRATION=1d
-
-# Logging
-LOG_LEVEL=debug
+```bash
+cd mon-api
+vim .env                  # Configurer la base de donnees
+npm run start:dev         # Lancer le serveur
 ```
 
-## Apres l'Installation
+## URLs
 
-1. **Creer la base de donnees** PostgreSQL
-2. **Verifier le fichier `.env`** et ajuster si necessaire
-3. **Lancer le serveur** : `npm run start:dev`
+| URL | Description |
+|-----|-------------|
+| http://localhost:3000/api | Base API |
+| http://localhost:3000/api/docs | Swagger UI |
+| http://localhost:3000/api/health | Health check |
 
-## Compatibilite
+## Scripts npm
 
-- Linux (Ubuntu, Debian, etc.)
-- macOS
-- Windows (Git Bash, WSL)
-
-## Version
-
-1.0.0
+```bash
+npm run start:dev    # Dev avec hot reload
+npm run start:debug  # Debug mode
+npm run start:prod   # Production
+npm run build        # Build
+npm run lint         # ESLint
+npm run test         # Tests Jest
+npm run test:cov     # Coverage
+```

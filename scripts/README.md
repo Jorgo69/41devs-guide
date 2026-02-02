@@ -2,12 +2,24 @@
 
 Ensemble de scripts pour automatiser la creation et la gestion de projets NestJS suivant le pattern CQRS.
 
+## Installation Globale
+
+Les scripts sont configures pour etre accessibles depuis n'importe quel dossier.
+Voir [INSTALLATION.md](./INSTALLATION.md) pour les details.
+
+```bash
+# Usage depuis n'importe ou
+generate-module.sh products
+setup-nestjs-cqrs.sh
+```
+
 ## Contenu
 
 | Script | Description | Documentation |
 |--------|-------------|---------------|
 | `setup-nestjs-cqrs.sh` | Installation des dependances NestJS + CQRS | [setup-nestjs-cqrs.md](./setup-nestjs-cqrs.md) |
 | `generate-module.sh` | Generateur de modules CQRS | [generate-module.md](./generate-module.md) |
+
 
 ## Documentation Base de Donnees
 
