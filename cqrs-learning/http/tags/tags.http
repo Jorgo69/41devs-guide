@@ -1,5 +1,5 @@
 ### Tags API - REST Client
-@baseUrl = http://localhost:3000
+@baseUrl = http://localhost:3000/api
 
 ### ============================================================
 ### ✏️ COMMANDS (Écritures - POST)

@@ -1,10 +1,4 @@
 // src/todos/todos.controller.ts
-// ═══════════════════════════════════════════════════════════════════════════
-// 🎯 CONTROLLER = Point d'entrée HTTP (comme dans Laravel)
-// Mais ici, au lieu d'appeler un Service directement,
-// on utilise CommandBus (pour les écritures) et QueryBus (pour les lectures)
-// ═══════════════════════════════════════════════════════════════════════════
-
 import {
   Controller,
   Get,
@@ -19,6 +13,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 
 // DTOs
 import { CreateTodoDto } from './dto/create-todo.dto';
@@ -36,75 +31,72 @@ import { GetTodoByIdQuery } from './queries/get-todo-by-id.query';
 // Entity
 import { Todo } from './models/todo.entity';
 
-@Controller('todos') // Route: /todos
+@ApiTags('todos')
+@Controller('todos')
 export class TodosController {
   private readonly logger = new Logger(TodosController.name);
 
   constructor(
-    private readonly commandBus: CommandBus, // Pour les écritures (POST, PUT, DELETE)
-    private readonly queryBus: QueryBus, // Pour les lectures (GET)
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
   ) {}
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 📋 GET /todos - Liste tous les todos
-  // ═══════════════════════════════════════════════════════════════════
   @Get()
+  @ApiOperation({ summary: 'Liste tous les todos' })
+  @ApiQuery({ name: 'completed', required: false, type: Boolean })
+  @ApiResponse({ status: 200, description: 'Liste des todos' })
   async findAll(
     @Query('completed', new ParseBoolPipe({ optional: true })) completed?: boolean,
   ): Promise<Todo[]> {
-    this.logger.log('GET /todos - Demande de liste');
-
-    // On utilise le QueryBus pour envoyer la Query
+    this.logger.log('GET /todos');
     return this.queryBus.execute(new GetTodosQuery(completed));
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 🔍 GET /todos/:id - Retourne un todo par son ID
-  // ═══════════════════════════════════════════════════════════════════
   @Get(':id')
+  @ApiOperation({ summary: 'Retourne un todo par son ID' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Le todo demande' })
+  @ApiResponse({ status: 404, description: 'Todo non trouve' })
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Todo> {
-    this.logger.log(`GET /todos/${id} - Demande de détail`);
-
+    this.logger.log(`GET /todos/${id}`);
     return this.queryBus.execute(new GetTodoByIdQuery(id));
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // ➕ POST /todos - Crée un nouveau todo
-  // ═══════════════════════════════════════════════════════════════════
   @Post()
+  @ApiOperation({ summary: 'Cree un nouveau todo' })
+  @ApiResponse({ status: 201, description: 'Todo cree avec succes' })
+  @ApiResponse({ status: 400, description: 'Donnees invalides' })
   async create(@Body() dto: CreateTodoDto): Promise<Todo> {
-    this.logger.log('POST /todos - Création');
-
-    // On utilise le CommandBus pour envoyer la Command
+    this.logger.log('POST /todos');
     return this.commandBus.execute(
       new CreateTodoCommand(dto.title, dto.description, dto.priority),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // ✏️ PATCH /todos/:id - Met à jour un todo
-  // ═══════════════════════════════════════════════════════════════════
   @Patch(':id')
+  @ApiOperation({ summary: 'Met a jour un todo' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Todo mis a jour' })
+  @ApiResponse({ status: 404, description: 'Todo non trouve' })
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTodoDto,
   ): Promise<Todo> {
-    this.logger.log(`PATCH /todos/${id} - Mise à jour`);
-
+    this.logger.log(`PATCH /todos/${id}`);
     return this.commandBus.execute(
       new UpdateTodoCommand(id, dto.title, dto.description, dto.completed, dto.priority),
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // 🗑️ DELETE /todos/:id - Supprime un todo
-  // ═══════════════════════════════════════════════════════════════════
   @Delete(':id')
+  @ApiOperation({ summary: 'Supprime un todo (soft delete)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Todo supprime' })
+  @ApiResponse({ status: 404, description: 'Todo non trouve' })
   async remove(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
-    this.logger.log(`DELETE /todos/${id} - Suppression`);
-
+    this.logger.log(`DELETE /todos/${id}`);
     await this.commandBus.execute(new DeleteTodoCommand(id));
-
-    return { message: `Todo ${id} supprimé avec succès` };
+    return { message: `Todo ${id} supprime avec succes` };
   }
 }
+
