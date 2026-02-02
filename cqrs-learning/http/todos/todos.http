@@ -1,0 +1,119 @@
+### Todos API - REST Client
+### Variables
+@baseUrl = http://localhost:3000
+
+### ============================================================
+### 📋 QUERIES (Lectures - GET)
+### ============================================================
+
+### Lister tous les Todos
+# @name getAllTodos
+GET {{baseUrl}}/todos
+Content-Type: application/json
+
+###
+
+### Lister les Todos terminés uniquement
+GET {{baseUrl}}/todos?completed=true
+Content-Type: application/json
+
+###
+
+### Lister les Todos non terminés uniquement
+GET {{baseUrl}}/todos?completed=false
+Content-Type: application/json
+
+###
+
+### Récupérer un Todo par ID
+# @name getTodoById
+GET {{baseUrl}}/todos/1
+Content-Type: application/json
+
+### ============================================================
+### ✏️ COMMANDS (Écritures - POST/PATCH/DELETE)
+### ============================================================
+
+### Créer un nouveau Todo
+# @name createTodo
+POST {{baseUrl}}/todos
+Content-Type: application/json
+
+{
+    "title": "Apprendre CQRS avec NestJS",
+    "description": "Comprendre les Commands, Queries et leurs Handlers"
+}
+
+###
+
+### Créer un Todo sans description
+POST {{baseUrl}}/todos
+Content-Type: application/json
+
+{
+    "title": "Todo simple sans description"
+}
+
+###
+
+### Mettre à jour un Todo (marquer comme complété)
+# @name updateTodo
+PATCH {{baseUrl}}/todos/1
+Content-Type: application/json
+
+{
+    "completed": true
+}
+
+###
+
+### Mettre à jour le titre d'un Todo
+PATCH {{baseUrl}}/todos/1
+Content-Type: application/json
+
+{
+    "title": "Nouveau titre mis à jour"
+}
+
+###
+
+### Mettre à jour plusieurs champs
+PATCH {{baseUrl}}/todos/1
+Content-Type: application/json
+
+{
+    "title": "Todo modifié",
+    "description": "Description mise à jour",
+    "completed": false
+}
+
+###
+
+### Supprimer un Todo
+# @name deleteTodo
+DELETE {{baseUrl}}/todos/1
+Content-Type: application/json
+
+### ============================================================
+### 🧪 TESTS DE VALIDATION (Erreurs attendues)
+### ============================================================
+
+### Créer sans titre (devrait échouer - validation)
+POST {{baseUrl}}/todos
+Content-Type: application/json
+
+{
+    "description": "Pas de titre - erreur attendue"
+}
+
+###
+
+### Récupérer un Todo inexistant (404)
+GET {{baseUrl}}/todos/9999
+Content-Type: application/json
+
+###
+
+### Supprimer un Todo inexistant (404)
+DELETE {{baseUrl}}/todos/9999
+Content-Type: application/json

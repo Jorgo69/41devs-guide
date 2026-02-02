@@ -1,0 +1,11 @@
+### Variables globales REST Client
+### Ce fichier contient les variables partagées entre tous les fichiers .http
+
+@baseUrl = http://localhost:3000
+@contentType = application/json
+
+### Pour tester avec un environnement différent (staging, production)
+### Commenter/décommenter selon l'environnement :
+
+# @baseUrl = http://staging.example.com
+# @baseUrl = https://api.production.com

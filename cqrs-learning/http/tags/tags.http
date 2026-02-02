@@ -1,0 +1,47 @@
+### Tags API - REST Client
+@baseUrl = http://localhost:3000
+
+### ============================================================
+### ✏️ COMMANDS (Écritures - POST)
+### ============================================================
+
+### Créer un nouveau Tag
+# @name createTag
+POST {{baseUrl}}/tags
+Content-Type: application/json
+
+{
+    "name": "Urgent",
+    "color": "#FF5733"
+}
+
+###
+
+### Créer un Tag sans couleur
+POST {{baseUrl}}/tags
+Content-Type: application/json
+
+{
+    "name": "Important"
+}
+
+###
+
+### Test validation - couleur invalide (devrait échouer)
+POST {{baseUrl}}/tags
+Content-Type: application/json
+
+{
+    "name": "Test",
+    "color": "rouge"
+}
+
+###
+
+### Test validation - sans nom (devrait échouer)
+POST {{baseUrl}}/tags
+Content-Type: application/json
+
+{
+    "color": "#00FF00"
+}

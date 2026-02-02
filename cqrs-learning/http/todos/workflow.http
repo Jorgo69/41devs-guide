@@ -1,0 +1,102 @@
+### ============================================================
+### 🚀 WORKFLOW COMPLET - Test du flux CQRS
+### ============================================================
+### Exécute ces requêtes dans l'ordre pour tester le cycle complet
+### ============================================================
+
+@baseUrl = http://localhost:3000
+
+### ============================================================
+### ÉTAPE 1: Vérifier que la liste est vide (ou voir les existants)
+### ============================================================
+# @name step1_listTodos
+GET {{baseUrl}}/todos
+
+###
+
+### ============================================================
+### ÉTAPE 2: Créer un premier Todo (Command: CreateTodoCommand)
+### ============================================================
+# @name step2_createFirst
+POST {{baseUrl}}/todos
+Content-Type: application/json
+
+{
+    "title": "4 Test Todo CQRS",
+    "description": "Test de la commande CreateTodoCommand - 4"
+}
+
+###
+
+### ============================================================
+### ÉTAPE 3: Créer un deuxième Todo
+### ============================================================
+# @name step3_createSecond
+POST {{baseUrl}}/todos
+Content-Type: application/json
+
+{
+    "title": "Deuxième Todo",
+    "description": "Pour tester le filtrage"
+}
+
+###
+
+### ============================================================
+### ÉTAPE 4: Lister tous les Todos (Query: GetTodosQuery)
+### ============================================================
+# @name step4_listAll
+GET {{baseUrl}}/todos
+
+###
+
+### ============================================================
+### ÉTAPE 5: Récupérer le premier Todo (Query: GetTodoByIdQuery)
+### ============================================================
+# @name step5_getById
+GET {{baseUrl}}/todos/1
+
+###
+
+### ============================================================
+### ÉTAPE 6: Marquer le premier comme complété (Command: UpdateTodoCommand)
+### ============================================================
+# @name step6_complete
+PATCH {{baseUrl}}/todos/1
+Content-Type: application/json
+
+{
+    "completed": true
+}
+
+###
+
+### ============================================================
+### ÉTAPE 7: Filtrer les complétés seulement
+### ============================================================
+# @name step7_filterCompleted
+GET {{baseUrl}}/todos?completed=true
+
+###
+
+### ============================================================
+### ÉTAPE 8: Filtrer les non-complétés
+### ============================================================
+# @name step8_filterNotCompleted
+GET {{baseUrl}}/todos?completed=false
+
+###
+
+### ============================================================
+### ÉTAPE 9: Supprimer le premier Todo (Command: DeleteTodoCommand)
+### ============================================================
+# @name step9_delete
+DELETE {{baseUrl}}/todos/1
+
+###
+
+### ============================================================
+### ÉTAPE 10: Vérifier la suppression
+### ============================================================
+# @name step10_verifyDeletion
+GET {{baseUrl}}/todos
