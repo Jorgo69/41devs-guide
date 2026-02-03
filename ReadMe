@@ -1,18 +1,95 @@
-# Creer un projet (avec install)
-setup-nestjs-cqrs.sh mon-api
+# 41DEVS Scripts - Guide d'utilisation
 
-# Ou sans install (plus rapide)
+> Scripts de generation de projets NestJS CQRS
+> Cree par **Ibrahim** pour l'equipe 41DEVS
+
+---
+
+## 🚀 Workflow 1 : Avec installation automatique
+
+```bash
+setup-nestjs-cqrs.sh mon-api
+cd mon-api
+npm run db:setup          # Creer la base PostgreSQL
+npm run start:dev         # Lancer l'appli
+```
+
+---
+
+## 🚀 Workflow 2 : Avec `--no-install` (plus rapide / offline)
+
+```bash
 setup-nestjs-cqrs.sh mon-api --no-install
 cd mon-api
-npm install --legacy-peer-deps
+npm install --legacy-peer-deps   # Installer manuellement
+npm run db:setup                  # Creer la base PostgreSQL
+npm run start:dev                 # Lancer l'appli
+```
 
-# Configurer la base de donnees
-vim src/config/default.yml
+---
 
-# Lancer
-npm run start:dev
+## 📋 Resume des etapes completes
 
+| # | Commande | Description |
+|---|----------|-------------|
+| 1 | `setup-nestjs-cqrs.sh mon-api` | Creer le projet |
+| 2 | `cd mon-api` | Aller dans le dossier |
+| 3 | `npm install --legacy-peer-deps` | *(seulement si --no-install)* |
+| 4 | `npm run db:setup` | Creer la BDD PostgreSQL (user root + base mon_api) |
+| 5 | `npm run start:dev` | Lancer l'application |
+| 6 | Ouvrir http://localhost:3000/api | Swagger UI |
 
-# Generer un module
-cd mon-api
-generate-module.sh products
+---
+
+## 🔄 Commandes utiles apres
+
+| Commande | Description |
+|----------|-------------|
+| `npm run db:reset` | Supprimer + recreer la BDD (comme `migrate:fresh`) |
+| `npm run db:drop` | Supprimer la BDD |
+| `generate-module.sh products` | Ajouter un nouveau module CRUD |
+
+---
+
+## 🗄️ Base de donnees
+
+Le nom de la BDD est derive du nom du projet (`-` → `_`):
+- `mon-api` → `mon_api`
+- `test-41devs` → `test_41devs`
+
+Credentials par defaut (dev):
+- **User:** `root`
+- **Password:** `root`
+
+---
+
+## 📁 Structure generee
+
+```
+mon-api/
+├── src/
+│   ├── config/
+│   │   ├── default.yml          # Configuration
+│   │   └── configuration.ts
+│   ├── auth/                     # Module Auth (register, login, me)
+│   ├── user/                     # Module User (CRUD)
+│   ├── health/                   # Module Health
+│   ├── main.ts
+│   └── app.module.ts
+├── database/
+│   ├── setup-database.sql       # Creer la BDD
+│   └── drop-database.sql        # Supprimer la BDD
+├── test/
+├── package.json
+└── README.md
+```
+
+---
+
+## 🌐 URLs
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:3000 | API Root |
+| http://localhost:3000/api | Swagger UI |
+| http://localhost:3000/health | Health Check |
