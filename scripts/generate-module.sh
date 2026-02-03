@@ -1,936 +1,595 @@
 #!/bin/bash
-# ==============================================================================
-# GENERATE-MODULE.SH - Generateur de Module CQRS pour NestJS (Standard 41DEVS)
-# ==============================================================================
-# Description:
-#   Ce script genere automatiquement la structure complete d'un module NestJS
-#   suivant le pattern CQRS (Command Query Responsibility Segregation) et les
-#   conventions de nommage 41DEVS.
+
+# ============================================================
+# 🔧 GENERATE-MODULE.SH - Standard 41DEVS
+# ============================================================
+# Cree par Ibrahim pour 41DEVS
+# Version: 2.0.0
+#
+# Genere un module NestJS avec le pattern CQRS 41DEVS:
+# - Structure Handler/Impl (pas de DTOs separes)
+# - Commands: create, update, delete
+# - Queries: getAll, findById
 #
 # Usage:
-#   ./generate-module.sh <nom-module> [options]
-#
-# Exemples:
-#   ./generate-module.sh products
-#   ./generate-module.sh users --no-queries
-#   ./generate-module.sh orders --dry-run
-#
-# Auteur: 41DEVS
-# Version: 1.1.0
-# Compatibilite: Linux, macOS, Windows (Git Bash/WSL)
-# ==============================================================================
+#   generate-module.sh <module-name>
+#   generate-module.sh products
+#   generate-module.sh -h
+# ============================================================
 
-set -e  # Arreter le script en cas d'erreur
+set -e
 
-# ==============================================================================
-# CONFIGURATION
-# ==============================================================================
-
-# Repertoire racine du projet (ou le script est execute)
-PROJECT_ROOT="$(pwd)"
-SRC_DIR="${PROJECT_ROOT}/src"
-
-# Couleurs pour les messages (compatible POSIX)
+# --- Couleurs ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# ==============================================================================
-# FONCTIONS UTILITAIRES
-# ==============================================================================
-
-# Affiche un message d'erreur et quitte
-error() {
-    printf "${RED}[ERREUR]${NC} %s\n" "$1" >&2
-    exit 1
-}
-
-# Affiche un message de succes
-success() {
-    printf "${GREEN}[OK]${NC} %s\n" "$1"
-}
-
-# Affiche un message d'info
-info() {
-    printf "${BLUE}[INFO]${NC} %s\n" "$1"
-}
-
-# Affiche un warning
-warn() {
-    printf "${YELLOW}[ATTENTION]${NC} %s\n" "$1"
-}
-
-# Convertit une chaine en PascalCase
-# Exemple: "user-profile" -> "UserProfile"
-to_pascal_case() {
-    echo "$1" | sed -r 's/(^|[-_])([a-z])/\U\2/g'
-}
-
-# Convertit une chaine en camelCase
-# Exemple: "user-profile" -> "userProfile"
-to_camel_case() {
-    local pascal=$(to_pascal_case "$1")
-    echo "$(echo "${pascal:0:1}" | tr '[:upper:]' '[:lower:]')${pascal:1}"
-}
-
-# Obtient le singulier d'un mot (simpliste: enleve le 's' final)
-# Pour une vraie gestion du pluriel, utiliser une lib externe
-to_singular() {
-    local word="$1"
-    # Cas speciaux
-    case "$word" in
-        *ies) echo "${word%ies}y" ;;
-        *es)  echo "${word%es}" ;;
-        *s)   echo "${word%s}" ;;
-        *)    echo "$word" ;;
-    esac
-}
-
-# Verifie si un dossier existe deja
-check_module_exists() {
-    if [ -d "${SRC_DIR}/${1}" ]; then
-        return 0
-    fi
-    return 1
-}
-
-# ==============================================================================
-# VALIDATION DES ARGUMENTS
-# ==============================================================================
-
-# Affiche l'aide
-show_help() {
-    cat << EOF
-Usage: $(basename "$0") <nom-module> [options]
-
-Genere un module NestJS complet avec le pattern CQRS (41DEVS Standard).
-
-Arguments:
-  nom-module    Nom du module en kebab-case (ex: products, user-profiles)
-
-Options:
-  --dry-run     Affiche ce qui serait cree sans rien creer
-  --no-queries  Ne genere pas les fichiers de queries
-  --no-commands Ne genere pas les fichiers de commands
-  --force       Ecrase le module s'il existe deja
-  -h, --help    Affiche cette aide
-
-Exemples:
-  $(basename "$0") products
-  $(basename "$0") user-profiles --dry-run
-  $(basename "$0") orders --force
-
-Structure generee:
-  src/<module>/
-  ├── <module>.module.ts
-  ├── <module>.controller.ts
-  ├── dto/
-  │   ├── create-<entity>.dto.ts
-  │   └── update-<entity>.dto.ts
-  ├── models/
-  │   └── <entity>.entity.ts
-  ├── commands/
-  │   ├── create-<entity>.command.ts
-  │   ├── create-<entity>.command.handler.ts
-  │   ├── update-<entity>.command.ts
-  │   ├── update-<entity>.command.handler.ts
-  │   ├── delete-<entity>.command.ts
-  │   └── delete-<entity>.command.handler.ts
-  └── queries/
-      ├── get-<entities>.query.ts
-      ├── get-<entities>.query.handler.ts
-      ├── get-<entity>-by-id.query.ts
-      └── get-<entity>-by-id.query.handler.ts
-EOF
-}
-
-# Parse des arguments
-DRY_RUN=false
-NO_QUERIES=false
-NO_COMMANDS=false
-FORCE=false
+# --- Variables ---
 MODULE_NAME=""
+MODULE_NAME_LOWER=""
+MODULE_NAME_UPPER=""
+MODULE_NAME_PASCAL=""
+ENTITY_NAME=""
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        --dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        --no-queries)
-            NO_QUERIES=true
-            shift
-            ;;
-        --no-commands)
-            NO_COMMANDS=true
-            shift
-            ;;
-        --force)
-            FORCE=true
-            shift
-            ;;
-        -*)
-            error "Option inconnue: $1. Utilisez --help pour voir les options disponibles."
-            ;;
-        *)
-            if [ -z "$MODULE_NAME" ]; then
-                MODULE_NAME="$1"
-            else
-                error "Argument inattendu: $1"
-            fi
-            shift
-            ;;
-    esac
-done
+# --- Afficher l'aide ---
+show_help() {
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║          🔧 GENERATE-MODULE - Standard 41DEVS                ║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Usage:${NC}"
+    echo "  generate-module.sh <module-name>"
+    echo ""
+    echo -e "${YELLOW}Exemples:${NC}"
+    echo "  generate-module.sh products"
+    echo "  generate-module.sh order-items"
+    echo "  generate-module.sh Category"
+    echo ""
+    echo -e "${YELLOW}Structure generee:${NC}"
+    echo "  src/<module>/"
+    echo "  ├── <module>.controller.ts"
+    echo "  ├── <module>.module.ts"
+    echo "  ├── models/"
+    echo "  │   └── <entity>.model/"
+    echo "  ├── commands/"
+    echo "  │   ├── handlers/"
+    echo "  │   │   ├── create-<entity>.command.handler/"
+    echo "  │   │   ├── update-<entity>.command.handler/"
+    echo "  │   │   └── delete-<entity>.command.handler/"
+    echo "  │   └── impl/"
+    echo "  │       ├── create-<entity>.command/"
+    echo "  │       ├── update-<entity>.command/"
+    echo "  │       └── delete-<entity>.command/"
+    echo "  └── queries/"
+    echo "      ├── handlers/"
+    echo "      │   ├── get-all.handler/"
+    echo "      │   └── find-by-id.handler/"
+    echo "      └── impl/"
+    echo "          ├── get-all.query/"
+    echo "          └── find-by-id.query/"
+    echo ""
+}
 
-# Verification du nom du module
-if [ -z "$MODULE_NAME" ]; then
-    error "Le nom du module est requis. Utilisez --help pour voir l'usage."
-fi
-
-# Validation du format du nom (kebab-case, lettres minuscules et tirets uniquement)
-if ! echo "$MODULE_NAME" | grep -qE '^[a-z][a-z0-9-]*[a-z0-9]$|^[a-z]$'; then
-    error "Le nom du module doit etre en kebab-case (ex: products, user-profiles)"
-fi
-
-# ==============================================================================
-# PREPARATION DES NOMS
-# ==============================================================================
-
-# Noms derives du module
-SINGULAR_NAME=$(to_singular "$MODULE_NAME")
-MODULE_PASCAL=$(to_pascal_case "$MODULE_NAME")
-SINGULAR_PASCAL=$(to_pascal_case "$SINGULAR_NAME")
-MODULE_CAMEL=$(to_camel_case "$MODULE_NAME")
-SINGULAR_CAMEL=$(to_camel_case "$SINGULAR_NAME")
-
-# Chemins des fichiers
-MODULE_DIR="${SRC_DIR}/${MODULE_NAME}"
-
-# ==============================================================================
-# VERIFICATION PRE-GENERATION
-# ==============================================================================
-
-info "Preparation de la generation du module: ${MODULE_NAME}"
-info "  - Module (plural):  ${MODULE_NAME} -> ${MODULE_PASCAL}"
-info "  - Entity (singular): ${SINGULAR_NAME} -> ${SINGULAR_PASCAL}"
-
-# Verification si le module existe deja
-if check_module_exists "$MODULE_NAME"; then
-    if [ "$FORCE" = true ]; then
-        warn "Le module ${MODULE_NAME} existe deja. Il sera ecrase (--force)."
-        if [ "$DRY_RUN" = false ]; then
-            rm -rf "${MODULE_DIR}"
-        fi
+# --- Convertir le nom ---
+convert_names() {
+    # Convertir en lowercase avec tirets
+    MODULE_NAME_LOWER=$(echo "$MODULE_NAME" | sed 's/\([A-Z]\)/-\1/g' | sed 's/^-//' | tr '[:upper:]' '[:lower:]')
+    
+    # Convertir en PascalCase
+    MODULE_NAME_PASCAL=$(echo "$MODULE_NAME_LOWER" | sed -r 's/(^|-)([a-z])/\U\2/g')
+    
+    # Nom de l'entite (singulier)
+    if [[ "$MODULE_NAME_LOWER" == *s ]]; then
+        ENTITY_NAME="${MODULE_NAME_LOWER%s}"
     else
-        error "Le module ${MODULE_NAME} existe deja. Utilisez --force pour l'ecraser."
+        ENTITY_NAME="$MODULE_NAME_LOWER"
     fi
-fi
+    
+    # Entity en PascalCase
+    ENTITY_PASCAL=$(echo "$ENTITY_NAME" | sed -r 's/(^|-)([a-z])/\U\2/g')
+}
 
-# Mode dry-run
-if [ "$DRY_RUN" = true ]; then
-    info "Mode dry-run active. Aucun fichier ne sera cree."
-    info ""
-    info "Fichiers qui seraient crees:"
-    echo "  ${MODULE_DIR}/${MODULE_NAME}.module.ts"
-    echo "  ${MODULE_DIR}/${MODULE_NAME}.controller.ts"
-    echo "  ${MODULE_DIR}/dto/create-${SINGULAR_NAME}.dto.ts"
-    echo "  ${MODULE_DIR}/dto/update-${SINGULAR_NAME}.dto.ts"
-    echo "  ${MODULE_DIR}/models/${SINGULAR_NAME}.entity.ts"
-    if [ "$NO_COMMANDS" = false ]; then
-        echo "  ${MODULE_DIR}/commands/create-${SINGULAR_NAME}.command.ts"
-        echo "  ${MODULE_DIR}/commands/create-${SINGULAR_NAME}.command.handler.ts"
-        echo "  ${MODULE_DIR}/commands/update-${SINGULAR_NAME}.command.ts"
-        echo "  ${MODULE_DIR}/commands/update-${SINGULAR_NAME}.command.handler.ts"
-        echo "  ${MODULE_DIR}/commands/delete-${SINGULAR_NAME}.command.ts"
-        echo "  ${MODULE_DIR}/commands/delete-${SINGULAR_NAME}.command.handler.ts"
+# --- Verifier les arguments ---
+parse_args() {
+    if [[ $# -eq 0 ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+        show_help
+        exit 0
     fi
-    if [ "$NO_QUERIES" = false ]; then
-        echo "  ${MODULE_DIR}/queries/get-${MODULE_NAME}.query.ts"
-        echo "  ${MODULE_DIR}/queries/get-${MODULE_NAME}.query.handler.ts"
-        echo "  ${MODULE_DIR}/queries/get-${SINGULAR_NAME}-by-id.query.ts"
-        echo "  ${MODULE_DIR}/queries/get-${SINGULAR_NAME}-by-id.query.handler.ts"
+    
+    MODULE_NAME="$1"
+    convert_names
+}
+
+# --- Verifier qu'on est dans un projet NestJS ---
+check_project() {
+    if [[ ! -f "package.json" ]] || [[ ! -d "src" ]]; then
+        echo -e "${RED}❌ Erreur: Vous devez etre dans un projet NestJS${NC}"
+        echo -e "${YELLOW}   Verifiez que package.json et src/ existent${NC}"
+        exit 1
     fi
-    exit 0
-fi
+}
 
-# ==============================================================================
-# CREATION DES DOSSIERS
-# ==============================================================================
+# --- Creer la structure de dossiers ---
+create_directories() {
+    echo -e "${BLUE}📁 Creation de la structure pour ${MODULE_NAME_PASCAL}...${NC}"
+    
+    mkdir -p "src/$MODULE_NAME_LOWER/models/${ENTITY_NAME}.model"
+    mkdir -p "src/$MODULE_NAME_LOWER/commands/handlers/create-${ENTITY_NAME}.command.handler"
+    mkdir -p "src/$MODULE_NAME_LOWER/commands/handlers/update-${ENTITY_NAME}.command.handler"
+    mkdir -p "src/$MODULE_NAME_LOWER/commands/handlers/delete-${ENTITY_NAME}.command.handler"
+    mkdir -p "src/$MODULE_NAME_LOWER/commands/impl/create-${ENTITY_NAME}.command"
+    mkdir -p "src/$MODULE_NAME_LOWER/commands/impl/update-${ENTITY_NAME}.command"
+    mkdir -p "src/$MODULE_NAME_LOWER/commands/impl/delete-${ENTITY_NAME}.command"
+    mkdir -p "src/$MODULE_NAME_LOWER/queries/handlers/get-all.handler"
+    mkdir -p "src/$MODULE_NAME_LOWER/queries/handlers/find-by-id.handler"
+    mkdir -p "src/$MODULE_NAME_LOWER/queries/impl/get-all.query"
+    mkdir -p "src/$MODULE_NAME_LOWER/queries/impl/find-by-id.query"
+}
 
-info "Creation de la structure de dossiers..."
-mkdir -p "${MODULE_DIR}/dto"
-mkdir -p "${MODULE_DIR}/models"
-[ "$NO_COMMANDS" = false ] && mkdir -p "${MODULE_DIR}/commands"
-[ "$NO_QUERIES" = false ] && mkdir -p "${MODULE_DIR}/queries"
-
-# ==============================================================================
-# GENERATION DES FICHIERS - ENTITY
-# ==============================================================================
-
-info "Generation de l'entity..."
-cat > "${MODULE_DIR}/models/${SINGULAR_NAME}.entity.ts" << EOF
-// src/${MODULE_NAME}/models/${SINGULAR_NAME}.entity.ts
+# --- Creer le Model ---
+create_model() {
+    echo -e "${BLUE}📄 Creation du Model ${ENTITY_PASCAL}...${NC}"
+    
+    cat > "src/$MODULE_NAME_LOWER/models/${ENTITY_NAME}.model/${ENTITY_NAME}.model.ts" << EOF
+/**
+ * ${ENTITY_PASCAL} Entity Model - Standard 41DEVS
+ */
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
-  DeleteDateColumn,
 } from 'typeorm';
 
-/**
- * Entity ${SINGULAR_PASCAL}
- * Represente la table '${MODULE_NAME}' dans la base de donnees
- */
-@Entity('${MODULE_NAME}')
-export class ${SINGULAR_PASCAL} {
-  @PrimaryGeneratedColumn()
-  id: number;
+@Entity('${MODULE_NAME_LOWER}')
+export class ${ENTITY_PASCAL}Model {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-  @Column({ type: 'varchar', length: 255 })
+  @Column({ nullable: false })
   name: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ nullable: true })
   description: string;
 
-  @DeleteDateColumn()
-  deletedAt?: Date;
-
   @CreateDateColumn()
-  createdAt: Date;
+  created_at: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updated_at: Date;
 }
 EOF
-success "Entity: ${SINGULAR_NAME}.entity.ts"
+}
 
-# ==============================================================================
-# GENERATION DES FICHIERS - DTOs
-# ==============================================================================
-
-info "Generation des DTOs..."
-
-# Create DTO
-cat > "${MODULE_DIR}/dto/create-${SINGULAR_NAME}.dto.ts" << EOF
-// src/${MODULE_NAME}/dto/create-${SINGULAR_NAME}.dto.ts
-import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
-
+# --- Creer les Commands ---
+create_commands() {
+    echo -e "${BLUE}📄 Creation des Commands...${NC}"
+    
+    # Create Command (impl)
+    cat > "src/$MODULE_NAME_LOWER/commands/impl/create-${ENTITY_NAME}.command/create-${ENTITY_NAME}.command.ts" << EOF
 /**
- * DTO pour la creation d'un ${SINGULAR_PASCAL}
- * Valide les donnees entrantes pour POST /${MODULE_NAME}
+ * Create ${ENTITY_PASCAL} Command - Standard 41DEVS
  */
-export class Create${SINGULAR_PASCAL}Dto {
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+
+export class Create${ENTITY_PASCAL}Command {
+  @ApiProperty({
+    description: 'Name of the ${ENTITY_NAME}',
+    example: 'My ${ENTITY_PASCAL}',
+  })
+  @IsNotEmpty()
   @IsString()
-  @IsNotEmpty({ message: 'Le nom est obligatoire' })
-  @MaxLength(255, { message: 'Le nom ne doit pas depasser 255 caracteres' })
   name: string;
 
-  @IsString()
+  @ApiProperty({
+    description: 'Description',
+    required: false,
+    example: 'Description of the ${ENTITY_NAME}',
+  })
   @IsOptional()
+  @IsString()
   description?: string;
 }
 EOF
-success "DTO: create-${SINGULAR_NAME}.dto.ts"
 
-# Update DTO
-cat > "${MODULE_DIR}/dto/update-${SINGULAR_NAME}.dto.ts" << EOF
-// src/${MODULE_NAME}/dto/update-${SINGULAR_NAME}.dto.ts
-import { PartialType } from '@nestjs/mapped-types';
-import { Create${SINGULAR_PASCAL}Dto } from './create-${SINGULAR_NAME}.dto';
-
+    # Create Command Handler
+    cat > "src/$MODULE_NAME_LOWER/commands/handlers/create-${ENTITY_NAME}.command.handler/create-${ENTITY_NAME}.command.handler.ts" << EOF
 /**
- * DTO pour la mise a jour d'un ${SINGULAR_PASCAL}
- * Herite de Create${SINGULAR_PASCAL}Dto avec tous les champs optionnels
+ * Create ${ENTITY_PASCAL} Command Handler - Standard 41DEVS
  */
-export class Update${SINGULAR_PASCAL}Dto extends PartialType(Create${SINGULAR_PASCAL}Dto) {}
-EOF
-success "DTO: update-${SINGULAR_NAME}.dto.ts"
-
-# ==============================================================================
-# GENERATION DES FICHIERS - COMMANDS
-# ==============================================================================
-
-if [ "$NO_COMMANDS" = false ]; then
-    info "Generation des commands..."
-
-    # --- CREATE COMMAND ---
-    cat > "${MODULE_DIR}/commands/create-${SINGULAR_NAME}.command.ts" << EOF
-// src/${MODULE_NAME}/commands/create-${SINGULAR_NAME}.command.ts
-
-/**
- * Command pour creer un ${SINGULAR_PASCAL}
- * Transporte les donnees necessaires pour l'operation de creation
- */
-export class Create${SINGULAR_PASCAL}Command {
-  constructor(
-    public readonly name: string,
-    public readonly description?: string,
-  ) {}
-}
-EOF
-    success "Command: create-${SINGULAR_NAME}.command.ts"
-
-    # --- CREATE COMMAND HANDLER ---
-    cat > "${MODULE_DIR}/commands/create-${SINGULAR_NAME}.command.handler.ts" << EOF
-// src/${MODULE_NAME}/commands/create-${SINGULAR_NAME}.command.handler.ts
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Create${ENTITY_PASCAL}Command } from '../../impl/create-${ENTITY_NAME}.command/create-${ENTITY_NAME}.command';
+import { DataSource } from 'typeorm';
 import { Logger } from '@nestjs/common';
+import { ${ENTITY_PASCAL}Model } from '../../../models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';
 
-import { Create${SINGULAR_PASCAL}Command } from './create-${SINGULAR_NAME}.command';
-import { ${SINGULAR_PASCAL} } from '../models/${SINGULAR_NAME}.entity';
+@CommandHandler(Create${ENTITY_PASCAL}Command)
+export class Create${ENTITY_PASCAL}CommandHandler implements ICommandHandler<Create${ENTITY_PASCAL}Command> {
+  private readonly logger = new Logger(Create${ENTITY_PASCAL}CommandHandler.name);
 
-/**
- * Handler pour Create${SINGULAR_PASCAL}Command
- * Execute la logique metier de creation d'un ${SINGULAR_PASCAL}
- */
-@CommandHandler(Create${SINGULAR_PASCAL}Command)
-export class Create${SINGULAR_PASCAL}CommandHandler implements ICommandHandler<Create${SINGULAR_PASCAL}Command> {
-  private readonly logger = new Logger(Create${SINGULAR_PASCAL}CommandHandler.name);
+  constructor(private readonly dataSource: DataSource) {}
 
-  constructor(
-    @InjectRepository(${SINGULAR_PASCAL})
-    private readonly ${SINGULAR_CAMEL}Repository: Repository<${SINGULAR_PASCAL}>,
-  ) {}
+  async execute(command: Create${ENTITY_PASCAL}Command): Promise<any> {
+    try {
+      const repository = this.dataSource.getRepository(${ENTITY_PASCAL}Model);
 
-  async execute(command: Create${SINGULAR_PASCAL}Command): Promise<${SINGULAR_PASCAL}> {
-    this.logger.log(\`Creation d'un nouveau ${SINGULAR_PASCAL}: "\${command.name}"\`);
+      const entity = repository.create({
+        name: command.name,
+        description: command.description,
+      });
 
-    const ${SINGULAR_CAMEL} = this.${SINGULAR_CAMEL}Repository.create({
-      name: command.name,
-      description: command.description,
-    });
+      const saved = await repository.save(entity);
 
-    const saved${SINGULAR_PASCAL} = await this.${SINGULAR_CAMEL}Repository.save(${SINGULAR_CAMEL});
-
-    this.logger.log(\`${SINGULAR_PASCAL} cree avec succes (ID: \${saved${SINGULAR_PASCAL}.id})\`);
-
-    return saved${SINGULAR_PASCAL};
+      this.logger.log(\`${ENTITY_PASCAL} created: \${saved.id}\`);
+      return saved;
+    } catch (error) {
+      this.logger.error(\`Error creating ${ENTITY_NAME}: \${error.message}\`, error.stack);
+      throw error;
+    }
   }
 }
 EOF
-    success "Handler: create-${SINGULAR_NAME}.command.handler.ts"
 
-    # --- UPDATE COMMAND ---
-    cat > "${MODULE_DIR}/commands/update-${SINGULAR_NAME}.command.ts" << EOF
-// src/${MODULE_NAME}/commands/update-${SINGULAR_NAME}.command.ts
-
+    # Update Command (impl)
+    cat > "src/$MODULE_NAME_LOWER/commands/impl/update-${ENTITY_NAME}.command/update-${ENTITY_NAME}.command.ts" << EOF
 /**
- * Command pour mettre a jour un ${SINGULAR_PASCAL}
- * Transporte les donnees necessaires pour l'operation de mise a jour
+ * Update ${ENTITY_PASCAL} Command - Standard 41DEVS
  */
-export class Update${SINGULAR_PASCAL}Command {
-  constructor(
-    public readonly id: number,
-    public readonly name?: string,
-    public readonly description?: string,
-  ) {}
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+
+export class Update${ENTITY_PASCAL}Command {
+  @ApiProperty({
+    description: '${ENTITY_PASCAL} ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsNotEmpty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty({
+    description: 'Name',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiProperty({
+    description: 'Description',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  description?: string;
 }
 EOF
-    success "Command: update-${SINGULAR_NAME}.command.ts"
 
-    # --- UPDATE COMMAND HANDLER ---
-    cat > "${MODULE_DIR}/commands/update-${SINGULAR_NAME}.command.handler.ts" << EOF
-// src/${MODULE_NAME}/commands/update-${SINGULAR_NAME}.command.handler.ts
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Logger, NotFoundException } from '@nestjs/common';
-
-import { Update${SINGULAR_PASCAL}Command } from './update-${SINGULAR_NAME}.command';
-import { ${SINGULAR_PASCAL} } from '../models/${SINGULAR_NAME}.entity';
-
+    # Update Command Handler
+    cat > "src/$MODULE_NAME_LOWER/commands/handlers/update-${ENTITY_NAME}.command.handler/update-${ENTITY_NAME}.command.handler.ts" << EOF
 /**
- * Handler pour Update${SINGULAR_PASCAL}Command
- * Execute la logique metier de mise a jour d'un ${SINGULAR_PASCAL}
+ * Update ${ENTITY_PASCAL} Command Handler - Standard 41DEVS
  */
-@CommandHandler(Update${SINGULAR_PASCAL}Command)
-export class Update${SINGULAR_PASCAL}CommandHandler implements ICommandHandler<Update${SINGULAR_PASCAL}Command> {
-  private readonly logger = new Logger(Update${SINGULAR_PASCAL}CommandHandler.name);
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Update${ENTITY_PASCAL}Command } from '../../impl/update-${ENTITY_NAME}.command/update-${ENTITY_NAME}.command';
+import { DataSource } from 'typeorm';
+import { Logger, NotFoundException } from '@nestjs/common';
+import { ${ENTITY_PASCAL}Model } from '../../../models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';
 
-  constructor(
-    @InjectRepository(${SINGULAR_PASCAL})
-    private readonly ${SINGULAR_CAMEL}Repository: Repository<${SINGULAR_PASCAL}>,
-  ) {}
+@CommandHandler(Update${ENTITY_PASCAL}Command)
+export class Update${ENTITY_PASCAL}CommandHandler implements ICommandHandler<Update${ENTITY_PASCAL}Command> {
+  private readonly logger = new Logger(Update${ENTITY_PASCAL}CommandHandler.name);
 
-  async execute(command: Update${SINGULAR_PASCAL}Command): Promise<${SINGULAR_PASCAL}> {
-    this.logger.log(\`Mise a jour du ${SINGULAR_PASCAL} ID: \${command.id}\`);
+  constructor(private readonly dataSource: DataSource) {}
 
-    // Verifier que l'entite existe
-    const ${SINGULAR_CAMEL} = await this.${SINGULAR_CAMEL}Repository.findOne({
-      where: { id: command.id },
-    });
+  async execute(command: Update${ENTITY_PASCAL}Command): Promise<any> {
+    const repository = this.dataSource.getRepository(${ENTITY_PASCAL}Model);
 
-    if (!${SINGULAR_CAMEL}) {
-      throw new NotFoundException(\`${SINGULAR_PASCAL} avec l'ID \${command.id} non trouve\`);
+    const entity = await repository.findOne({ where: { id: command.id } });
+
+    if (!entity) {
+      throw new NotFoundException('${ENTITY_PASCAL} not found');
     }
 
-    // Mettre a jour uniquement les champs fournis
-    if (command.name !== undefined) ${SINGULAR_CAMEL}.name = command.name;
-    if (command.description !== undefined) ${SINGULAR_CAMEL}.description = command.description;
+    if (command.name) entity.name = command.name;
+    if (command.description) entity.description = command.description;
 
-    const updated${SINGULAR_PASCAL} = await this.${SINGULAR_CAMEL}Repository.save(${SINGULAR_CAMEL});
+    const updated = await repository.save(entity);
 
-    this.logger.log(\`${SINGULAR_PASCAL} \${command.id} mis a jour avec succes\`);
-
-    return updated${SINGULAR_PASCAL};
+    this.logger.log(\`${ENTITY_PASCAL} updated: \${updated.id}\`);
+    return updated;
   }
 }
 EOF
-    success "Handler: update-${SINGULAR_NAME}.command.handler.ts"
 
-    # --- DELETE COMMAND ---
-    cat > "${MODULE_DIR}/commands/delete-${SINGULAR_NAME}.command.ts" << EOF
-// src/${MODULE_NAME}/commands/delete-${SINGULAR_NAME}.command.ts
-
+    # Delete Command (impl)
+    cat > "src/$MODULE_NAME_LOWER/commands/impl/delete-${ENTITY_NAME}.command/delete-${ENTITY_NAME}.command.ts" << EOF
 /**
- * Command pour supprimer un ${SINGULAR_PASCAL}
- * Utilise le soft delete (marque comme supprime sans effacer)
+ * Delete ${ENTITY_PASCAL} Command - Standard 41DEVS
  */
-export class Delete${SINGULAR_PASCAL}Command {
-  constructor(public readonly id: number) {}
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsUUID } from 'class-validator';
+
+export class Delete${ENTITY_PASCAL}Command {
+  @ApiProperty({
+    description: '${ENTITY_PASCAL} ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsNotEmpty()
+  @IsUUID()
+  id: string;
 }
 EOF
-    success "Command: delete-${SINGULAR_NAME}.command.ts"
 
-    # --- DELETE COMMAND HANDLER ---
-    cat > "${MODULE_DIR}/commands/delete-${SINGULAR_NAME}.command.handler.ts" << EOF
-// src/${MODULE_NAME}/commands/delete-${SINGULAR_NAME}.command.handler.ts
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Logger, NotFoundException } from '@nestjs/common';
-
-import { Delete${SINGULAR_PASCAL}Command } from './delete-${SINGULAR_NAME}.command';
-import { ${SINGULAR_PASCAL} } from '../models/${SINGULAR_NAME}.entity';
-
+    # Delete Command Handler
+    cat > "src/$MODULE_NAME_LOWER/commands/handlers/delete-${ENTITY_NAME}.command.handler/delete-${ENTITY_NAME}.command.handler.ts" << EOF
 /**
- * Handler pour Delete${SINGULAR_PASCAL}Command
- * Execute le soft delete d'un ${SINGULAR_PASCAL}
+ * Delete ${ENTITY_PASCAL} Command Handler - Standard 41DEVS
  */
-@CommandHandler(Delete${SINGULAR_PASCAL}Command)
-export class Delete${SINGULAR_PASCAL}CommandHandler implements ICommandHandler<Delete${SINGULAR_PASCAL}Command> {
-  private readonly logger = new Logger(Delete${SINGULAR_PASCAL}CommandHandler.name);
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Delete${ENTITY_PASCAL}Command } from '../../impl/delete-${ENTITY_NAME}.command/delete-${ENTITY_NAME}.command';
+import { DataSource } from 'typeorm';
+import { Logger, NotFoundException } from '@nestjs/common';
+import { ${ENTITY_PASCAL}Model } from '../../../models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';
 
-  constructor(
-    @InjectRepository(${SINGULAR_PASCAL})
-    private readonly ${SINGULAR_CAMEL}Repository: Repository<${SINGULAR_PASCAL}>,
-  ) {}
+@CommandHandler(Delete${ENTITY_PASCAL}Command)
+export class Delete${ENTITY_PASCAL}CommandHandler implements ICommandHandler<Delete${ENTITY_PASCAL}Command> {
+  private readonly logger = new Logger(Delete${ENTITY_PASCAL}CommandHandler.name);
 
-  async execute(command: Delete${SINGULAR_PASCAL}Command): Promise<void> {
-    this.logger.log(\`Suppression du ${SINGULAR_PASCAL} ID: \${command.id}\`);
+  constructor(private readonly dataSource: DataSource) {}
 
-    // Verifier que l'entite existe
-    const ${SINGULAR_CAMEL} = await this.${SINGULAR_CAMEL}Repository.findOne({
-      where: { id: command.id },
-    });
+  async execute(command: Delete${ENTITY_PASCAL}Command): Promise<any> {
+    const repository = this.dataSource.getRepository(${ENTITY_PASCAL}Model);
 
-    if (!${SINGULAR_CAMEL}) {
-      throw new NotFoundException(\`${SINGULAR_PASCAL} avec l'ID \${command.id} non trouve\`);
+    const entity = await repository.findOne({ where: { id: command.id } });
+
+    if (!entity) {
+      throw new NotFoundException('${ENTITY_PASCAL} not found');
     }
 
-    // Soft delete (utilise DeleteDateColumn)
-    await this.${SINGULAR_CAMEL}Repository.softDelete(command.id);
+    await repository.remove(entity);
 
-    this.logger.log(\`${SINGULAR_PASCAL} \${command.id} supprime avec succes\`);
+    this.logger.log(\`${ENTITY_PASCAL} deleted: \${command.id}\`);
+    return { message: '${ENTITY_PASCAL} deleted successfully' };
   }
 }
 EOF
-    success "Handler: delete-${SINGULAR_NAME}.command.handler.ts"
-fi
-
-# ==============================================================================
-# GENERATION DES FICHIERS - QUERIES
-# ==============================================================================
-
-if [ "$NO_QUERIES" = false ]; then
-    info "Generation des queries..."
-
-    # Get All Query
-    cat > "${MODULE_DIR}/queries/get-${MODULE_NAME}.query.ts" << EOF
-// src/${MODULE_NAME}/queries/get-${MODULE_NAME}.query.ts
-
-/**
- * Query pour recuperer la liste des ${MODULE_PASCAL}
- */
-export class Get${MODULE_PASCAL}Query {
-  constructor() {}
 }
-EOF
-    success "Query: get-${MODULE_NAME}.query.ts"
 
-    # Get All Query Handler
-    cat > "${MODULE_DIR}/queries/get-${MODULE_NAME}.query.handler.ts" << EOF
-// src/${MODULE_NAME}/queries/get-${MODULE_NAME}.query.handler.ts
-import { QueryHandler, IQueryHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Logger } from '@nestjs/common';
-
-import { Get${MODULE_PASCAL}Query } from './get-${MODULE_NAME}.query';
-import { ${SINGULAR_PASCAL} } from '../models/${SINGULAR_NAME}.entity';
-
+# --- Creer les Queries ---
+create_queries() {
+    echo -e "${BLUE}📄 Creation des Queries...${NC}"
+    
+    # Get All Query (impl)
+    cat > "src/$MODULE_NAME_LOWER/queries/impl/get-all.query/get-all.query.ts" << EOF
 /**
- * Handler pour Get${MODULE_PASCAL}Query
- * Recupere la liste de tous les ${MODULE_PASCAL}
+ * Get All ${MODULE_NAME_PASCAL} Query - Standard 41DEVS
  */
-@QueryHandler(Get${MODULE_PASCAL}Query)
-export class Get${MODULE_PASCAL}QueryHandler implements IQueryHandler<Get${MODULE_PASCAL}Query> {
-  private readonly logger = new Logger(Get${MODULE_PASCAL}QueryHandler.name);
+export class GetAll${MODULE_NAME_PASCAL}Query {}
+EOF
 
-  constructor(
-    @InjectRepository(${SINGULAR_PASCAL})
-    private readonly ${SINGULAR_CAMEL}Repository: Repository<${SINGULAR_PASCAL}>,
-  ) {}
+    # Get All Handler
+    cat > "src/$MODULE_NAME_LOWER/queries/handlers/get-all.handler/get-all.handler.ts" << EOF
+/**
+ * Get All ${MODULE_NAME_PASCAL} Handler - Standard 41DEVS
+ */
+import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { GetAll${MODULE_NAME_PASCAL}Query } from '../../impl/get-all.query/get-all.query';
+import { DataSource } from 'typeorm';
+import { ${ENTITY_PASCAL}Model } from '../../../models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';
 
-  async execute(query: Get${MODULE_PASCAL}Query): Promise<${SINGULAR_PASCAL}[]> {
-    this.logger.log('Recuperation de la liste des ${MODULE_PASCAL}');
-    return this.${SINGULAR_CAMEL}Repository.find();
+@QueryHandler(GetAll${MODULE_NAME_PASCAL}Query)
+export class GetAll${MODULE_NAME_PASCAL}Handler implements IQueryHandler<GetAll${MODULE_NAME_PASCAL}Query> {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async execute(query: GetAll${MODULE_NAME_PASCAL}Query): Promise<any> {
+    return this.dataSource.getRepository(${ENTITY_PASCAL}Model).find();
   }
 }
 EOF
-    success "Handler: get-${MODULE_NAME}.query.handler.ts"
 
-    # Get By Id Query
-    cat > "${MODULE_DIR}/queries/get-${SINGULAR_NAME}-by-id.query.ts" << EOF
-// src/${MODULE_NAME}/queries/get-${SINGULAR_NAME}-by-id.query.ts
-
+    # Find By Id Query (impl)
+    cat > "src/$MODULE_NAME_LOWER/queries/impl/find-by-id.query/find-by-id.query.ts" << EOF
 /**
- * Query pour recuperer un ${SINGULAR_PASCAL} par son ID
+ * Find ${ENTITY_PASCAL} By Id Query - Standard 41DEVS
  */
-export class Get${SINGULAR_PASCAL}ByIdQuery {
-  constructor(public readonly id: number) {}
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsUUID } from 'class-validator';
+
+export class Find${ENTITY_PASCAL}ByIdQuery {
+  @ApiProperty({
+    description: '${ENTITY_PASCAL} ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsNotEmpty()
+  @IsUUID()
+  id: string;
 }
 EOF
-    success "Query: get-${SINGULAR_NAME}-by-id.query.ts"
 
-    # Get By Id Query Handler
-    cat > "${MODULE_DIR}/queries/get-${SINGULAR_NAME}-by-id.query.handler.ts" << EOF
-// src/${MODULE_NAME}/queries/get-${SINGULAR_NAME}-by-id.query.handler.ts
-import { QueryHandler, IQueryHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Logger, NotFoundException } from '@nestjs/common';
-
-import { Get${SINGULAR_PASCAL}ByIdQuery } from './get-${SINGULAR_NAME}-by-id.query';
-import { ${SINGULAR_PASCAL} } from '../models/${SINGULAR_NAME}.entity';
-
+    # Find By Id Handler
+    cat > "src/$MODULE_NAME_LOWER/queries/handlers/find-by-id.handler/find-by-id.handler.ts" << EOF
 /**
- * Handler pour Get${SINGULAR_PASCAL}ByIdQuery
- * Recupere un ${SINGULAR_PASCAL} specifique par son ID
+ * Find ${ENTITY_PASCAL} By Id Handler - Standard 41DEVS
  */
-@QueryHandler(Get${SINGULAR_PASCAL}ByIdQuery)
-export class Get${SINGULAR_PASCAL}ByIdQueryHandler implements IQueryHandler<Get${SINGULAR_PASCAL}ByIdQuery> {
-  private readonly logger = new Logger(Get${SINGULAR_PASCAL}ByIdQueryHandler.name);
+import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Find${ENTITY_PASCAL}ByIdQuery } from '../../impl/find-by-id.query/find-by-id.query';
+import { DataSource } from 'typeorm';
+import { NotFoundException } from '@nestjs/common';
+import { ${ENTITY_PASCAL}Model } from '../../../models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';
 
-  constructor(
-    @InjectRepository(${SINGULAR_PASCAL})
-    private readonly ${SINGULAR_CAMEL}Repository: Repository<${SINGULAR_PASCAL}>,
-  ) {}
+@QueryHandler(Find${ENTITY_PASCAL}ByIdQuery)
+export class Find${ENTITY_PASCAL}ByIdHandler implements IQueryHandler<Find${ENTITY_PASCAL}ByIdQuery> {
+  constructor(private readonly dataSource: DataSource) {}
 
-  async execute(query: Get${SINGULAR_PASCAL}ByIdQuery): Promise<${SINGULAR_PASCAL}> {
-    this.logger.log(\`Recuperation du ${SINGULAR_PASCAL} ID: \${query.id}\`);
-
-    const ${SINGULAR_CAMEL} = await this.${SINGULAR_CAMEL}Repository.findOne({
+  async execute(query: Find${ENTITY_PASCAL}ByIdQuery): Promise<any> {
+    const entity = await this.dataSource.getRepository(${ENTITY_PASCAL}Model).findOne({
       where: { id: query.id },
     });
 
-    if (!${SINGULAR_CAMEL}) {
-      throw new NotFoundException(\`${SINGULAR_PASCAL} avec l'ID \${query.id} non trouve\`);
+    if (!entity) {
+      throw new NotFoundException('${ENTITY_PASCAL} not found');
     }
 
-    return ${SINGULAR_CAMEL};
+    return entity;
   }
 }
 EOF
-    success "Handler: get-${SINGULAR_NAME}-by-id.query.handler.ts"
-fi
+}
 
-# ==============================================================================
-# GENERATION DES FICHIERS - CONTROLLER
-# ==============================================================================
-
-info "Generation du controller..."
-
-cat > "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
-// src/${MODULE_NAME}/${MODULE_NAME}.controller.ts
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Delete,
-  Body,
-  Param,
-  ParseIntPipe,
-  Logger,
-} from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
-
-// DTOs
-import { Create${SINGULAR_PASCAL}Dto } from './dto/create-${SINGULAR_NAME}.dto';
-import { Update${SINGULAR_PASCAL}Dto } from './dto/update-${SINGULAR_NAME}.dto';
-
-// Entity
-import { ${SINGULAR_PASCAL} } from './models/${SINGULAR_NAME}.entity';
-EOF
-
-# Ajouter imports conditionnels pour Commands
-if [ "$NO_COMMANDS" = false ]; then
-    cat >> "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
-
-// Commands
-import { Create${SINGULAR_PASCAL}Command } from './commands/create-${SINGULAR_NAME}.command';
-import { Update${SINGULAR_PASCAL}Command } from './commands/update-${SINGULAR_NAME}.command';
-import { Delete${SINGULAR_PASCAL}Command } from './commands/delete-${SINGULAR_NAME}.command';
-EOF
-fi
-
-# Ajouter imports conditionnels pour Queries
-if [ "$NO_QUERIES" = false ]; then
-    cat >> "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
-
-// Queries
-import { Get${MODULE_PASCAL}Query } from './queries/get-${MODULE_NAME}.query';
-import { Get${SINGULAR_PASCAL}ByIdQuery } from './queries/get-${SINGULAR_NAME}-by-id.query';
-EOF
-fi
-
-# Debut de la classe Controller
-cat >> "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
-
+# --- Creer le Controller ---
+create_controller() {
+    echo -e "${BLUE}📄 Creation du Controller...${NC}"
+    
+    cat > "src/$MODULE_NAME_LOWER/${MODULE_NAME_LOWER}.controller.ts" << EOF
 /**
- * Controller pour le module ${MODULE_PASCAL}
- * Expose les endpoints REST pour les operations CRUD
+ * ${MODULE_NAME_PASCAL} Controller - Standard 41DEVS
  */
-@Controller('${MODULE_NAME}')
-export class ${MODULE_PASCAL}Controller {
-  private readonly logger = new Logger(${MODULE_PASCAL}Controller.name);
+import { Body, Controller, Delete, Get, Post, Put, Query } from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Create${ENTITY_PASCAL}Command } from './commands/impl/create-${ENTITY_NAME}.command/create-${ENTITY_NAME}.command';
+import { Update${ENTITY_PASCAL}Command } from './commands/impl/update-${ENTITY_NAME}.command/update-${ENTITY_NAME}.command';
+import { Delete${ENTITY_PASCAL}Command } from './commands/impl/delete-${ENTITY_NAME}.command/delete-${ENTITY_NAME}.command';
+import { GetAll${MODULE_NAME_PASCAL}Query } from './queries/impl/get-all.query/get-all.query';
+import { Find${ENTITY_PASCAL}ByIdQuery } from './queries/impl/find-by-id.query/find-by-id.query';
 
+@ApiTags('${MODULE_NAME_PASCAL}')
+@Controller('${MODULE_NAME_LOWER}')
+export class ${MODULE_NAME_PASCAL}Controller {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
   ) {}
-EOF
 
-# Ajouter methodes GET si queries activees
-if [ "$NO_QUERIES" = false ]; then
-    cat >> "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
-
-  // ==========================================================================
-  // QUERIES (Lecture)
-  // ==========================================================================
-
-  /**
-   * GET /${MODULE_NAME}
-   * Retourne la liste de tous les ${MODULE_NAME}
-   */
-  @Get()
-  async findAll(): Promise<${SINGULAR_PASCAL}[]> {
-    this.logger.log('GET /${MODULE_NAME}');
-    return this.queryBus.execute(new Get${MODULE_PASCAL}Query());
-  }
-
-  /**
-   * GET /${MODULE_NAME}/:id
-   * Retourne un ${SINGULAR_NAME} par son ID
-   */
-  @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<${SINGULAR_PASCAL}> {
-    this.logger.log(\`GET /${MODULE_NAME}/\${id}\`);
-    return this.queryBus.execute(new Get${SINGULAR_PASCAL}ByIdQuery(id));
-  }
-EOF
-fi
-
-# Ajouter methodes POST/PATCH/DELETE si commands activees
-if [ "$NO_COMMANDS" = false ]; then
-    cat >> "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
-
-  // ==========================================================================
-  // COMMANDS (Ecriture)
-  // ==========================================================================
-
-  /**
-   * POST /${MODULE_NAME}
-   * Cree un nouveau ${SINGULAR_NAME}
-   */
   @Post()
-  async create(@Body() dto: Create${SINGULAR_PASCAL}Dto): Promise<${SINGULAR_PASCAL}> {
-    this.logger.log('POST /${MODULE_NAME}');
-    return this.commandBus.execute(
-      new Create${SINGULAR_PASCAL}Command(dto.name, dto.description),
-    );
+  @ApiOperation({ summary: 'Create a new ${ENTITY_NAME}' })
+  async create(@Body() command: Create${ENTITY_PASCAL}Command) {
+    return this.commandBus.execute(command);
   }
 
-  /**
-   * PATCH /${MODULE_NAME}/:id
-   * Met a jour un ${SINGULAR_NAME} existant
-   */
-  @Patch(':id')
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: Update${SINGULAR_PASCAL}Dto,
-  ): Promise<${SINGULAR_PASCAL}> {
-    this.logger.log(\`PATCH /${MODULE_NAME}/\${id}\`);
-    return this.commandBus.execute(
-      new Update${SINGULAR_PASCAL}Command(id, dto.name, dto.description),
-    );
+  @Get()
+  @ApiOperation({ summary: 'Get all ${MODULE_NAME_LOWER}' })
+  async getAll(@Query() query: GetAll${MODULE_NAME_PASCAL}Query) {
+    return this.queryBus.execute(query);
   }
 
-  /**
-   * DELETE /${MODULE_NAME}/:id
-   * Supprime un ${SINGULAR_NAME} (soft delete)
-   */
-  @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
-    this.logger.log(\`DELETE /${MODULE_NAME}/\${id}\`);
-    await this.commandBus.execute(new Delete${SINGULAR_PASCAL}Command(id));
-    return { message: \`${SINGULAR_PASCAL} \${id} supprime avec succes\` };
+  @Get('by-id')
+  @ApiOperation({ summary: 'Get ${ENTITY_NAME} by ID' })
+  async getById(@Query() query: Find${ENTITY_PASCAL}ByIdQuery) {
+    return this.queryBus.execute(query);
   }
-EOF
-fi
 
-# Fermer la classe
-cat >> "${MODULE_DIR}/${MODULE_NAME}.controller.ts" << EOF
+  @Put()
+  @ApiOperation({ summary: 'Update a ${ENTITY_NAME}' })
+  async update(@Body() command: Update${ENTITY_PASCAL}Command) {
+    return this.commandBus.execute(command);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Delete a ${ENTITY_NAME}' })
+  async delete(@Body() command: Delete${ENTITY_PASCAL}Command) {
+    return this.commandBus.execute(command);
+  }
 }
 EOF
+}
 
-success "Controller: ${MODULE_NAME}.controller.ts"
-
-# ==============================================================================
-# GENERATION DES FICHIERS - MODULE
-# ==============================================================================
-
-info "Generation du module..."
-
-cat > "${MODULE_DIR}/${MODULE_NAME}.module.ts" << EOF
-// src/${MODULE_NAME}/${MODULE_NAME}.module.ts
+# --- Creer le Module ---
+create_module() {
+    echo -e "${BLUE}📄 Creation du Module...${NC}"
+    
+    cat > "src/$MODULE_NAME_LOWER/${MODULE_NAME_LOWER}.module.ts" << EOF
+/**
+ * ${MODULE_NAME_PASCAL} Module - Standard 41DEVS
+ */
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
-
-// Controller
-import { ${MODULE_PASCAL}Controller } from './${MODULE_NAME}.controller';
-
-// Entity
-import { ${SINGULAR_PASCAL} } from './models/${SINGULAR_NAME}.entity';
-EOF
-
-# Imports conditionnels pour Command handlers
-if [ "$NO_COMMANDS" = false ]; then
-    cat >> "${MODULE_DIR}/${MODULE_NAME}.module.ts" << EOF
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ${MODULE_NAME_PASCAL}Controller } from './${MODULE_NAME_LOWER}.controller';
+import { ${ENTITY_PASCAL}Model } from './models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';
 
 // Command Handlers
-import { Create${SINGULAR_PASCAL}CommandHandler } from './commands/create-${SINGULAR_NAME}.command.handler';
-import { Update${SINGULAR_PASCAL}CommandHandler } from './commands/update-${SINGULAR_NAME}.command.handler';
-import { Delete${SINGULAR_PASCAL}CommandHandler } from './commands/delete-${SINGULAR_NAME}.command.handler';
-EOF
-fi
-
-# Imports conditionnels pour Query handlers
-if [ "$NO_QUERIES" = false ]; then
-    cat >> "${MODULE_DIR}/${MODULE_NAME}.module.ts" << EOF
+import { Create${ENTITY_PASCAL}CommandHandler } from './commands/handlers/create-${ENTITY_NAME}.command.handler/create-${ENTITY_NAME}.command.handler';
+import { Update${ENTITY_PASCAL}CommandHandler } from './commands/handlers/update-${ENTITY_NAME}.command.handler/update-${ENTITY_NAME}.command.handler';
+import { Delete${ENTITY_PASCAL}CommandHandler } from './commands/handlers/delete-${ENTITY_NAME}.command.handler/delete-${ENTITY_NAME}.command.handler';
 
 // Query Handlers
-import { Get${MODULE_PASCAL}QueryHandler } from './queries/get-${MODULE_NAME}.query.handler';
-import { Get${SINGULAR_PASCAL}ByIdQueryHandler } from './queries/get-${SINGULAR_NAME}-by-id.query.handler';
-EOF
-fi
+import { GetAll${MODULE_NAME_PASCAL}Handler } from './queries/handlers/get-all.handler/get-all.handler';
+import { Find${ENTITY_PASCAL}ByIdHandler } from './queries/handlers/find-by-id.handler/find-by-id.handler';
 
-# Construire les tableaux de handlers
-COMMAND_HANDLERS=""
-QUERY_HANDLERS=""
-
-if [ "$NO_COMMANDS" = false ]; then
-    COMMAND_HANDLERS="Create${SINGULAR_PASCAL}CommandHandler, Update${SINGULAR_PASCAL}CommandHandler, Delete${SINGULAR_PASCAL}CommandHandler"
-fi
-
-if [ "$NO_QUERIES" = false ]; then
-    QUERY_HANDLERS="Get${MODULE_PASCAL}QueryHandler, Get${SINGULAR_PASCAL}ByIdQueryHandler"
-fi
-
-# Combiner les handlers
-if [ -n "$COMMAND_HANDLERS" ] && [ -n "$QUERY_HANDLERS" ]; then
-    ALL_HANDLERS="${COMMAND_HANDLERS}, ${QUERY_HANDLERS}"
-elif [ -n "$COMMAND_HANDLERS" ]; then
-    ALL_HANDLERS="${COMMAND_HANDLERS}"
-elif [ -n "$QUERY_HANDLERS" ]; then
-    ALL_HANDLERS="${QUERY_HANDLERS}"
-else
-    ALL_HANDLERS=""
-fi
-
-cat >> "${MODULE_DIR}/${MODULE_NAME}.module.ts" << EOF
-
-// Regroupement des handlers pour une meilleure lisibilite
-const Handlers = [${ALL_HANDLERS}];
-
-/**
- * Module ${MODULE_PASCAL}
- * Regroupe tous les composants lies aux ${MODULE_NAME}
- */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([${SINGULAR_PASCAL}]),
     CqrsModule,
+    TypeOrmModule.forFeature([${ENTITY_PASCAL}Model]),
   ],
-  controllers: [${MODULE_PASCAL}Controller],
-  providers: [...Handlers],
-  exports: [TypeOrmModule],
+  controllers: [${MODULE_NAME_PASCAL}Controller],
+  providers: [
+    // Commands
+    Create${ENTITY_PASCAL}CommandHandler,
+    Update${ENTITY_PASCAL}CommandHandler,
+    Delete${ENTITY_PASCAL}CommandHandler,
+    // Queries
+    GetAll${MODULE_NAME_PASCAL}Handler,
+    Find${ENTITY_PASCAL}ByIdHandler,
+  ],
 })
-export class ${MODULE_PASCAL}Module {}
+export class ${MODULE_NAME_PASCAL}Module {}
 EOF
+}
 
-success "Module: ${MODULE_NAME}.module.ts"
+# --- Afficher les instructions ---
+show_instructions() {
+    echo ""
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║          ✨ MODULE ${MODULE_NAME_PASCAL} CREE!                          ${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}📁 Structure creee:${NC}"
+    echo "   src/$MODULE_NAME_LOWER/"
+    echo "   ├── ${MODULE_NAME_LOWER}.controller.ts"
+    echo "   ├── ${MODULE_NAME_LOWER}.module.ts"
+    echo "   ├── models/${ENTITY_NAME}.model/"
+    echo "   ├── commands/handlers/ + impl/"
+    echo "   └── queries/handlers/ + impl/"
+    echo ""
+    echo -e "${YELLOW}⚠️ Actions requises:${NC}"
+    echo ""
+    echo "1. Ajouter le module dans app.module.ts:"
+    echo ""
+    echo -e "   ${CYAN}import { ${MODULE_NAME_PASCAL}Module } from './${MODULE_NAME_LOWER}/${MODULE_NAME_LOWER}.module';${NC}"
+    echo ""
+    echo "   Et dans imports: ["
+    echo -e "     ${CYAN}${MODULE_NAME_PASCAL}Module,${NC}"
+    echo "   ]"
+    echo ""
+    echo "2. Ajouter l'entity dans TypeOrmModule (app.module.ts):"
+    echo ""
+    echo -e "   ${CYAN}import { ${ENTITY_PASCAL}Model } from './${MODULE_NAME_LOWER}/models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';${NC}"
+    echo ""
+    echo "   entities: ["
+    echo -e "     ${CYAN}${ENTITY_PASCAL}Model,${NC}"
+    echo "   ]"
+    echo ""
+    echo -e "${GREEN}══════════════════════════════════════════════════════════════${NC}"
+}
 
-# ==============================================================================
-# RESUME FINAL
-# ==============================================================================
+# ============================================================
+# MAIN
+# ============================================================
 
-echo ""
-echo "============================================================"
-printf "${GREEN}GENERATION TERMINEE AVEC SUCCES${NC}\n"
-echo "============================================================"
-echo ""
-echo "Module cree: ${MODULE_NAME}"
-echo "Emplacement: ${MODULE_DIR}"
-echo ""
-echo "Fichiers generes:"
-echo "  - ${MODULE_NAME}.module.ts"
-echo "  - ${MODULE_NAME}.controller.ts"
-echo "  - dto/create-${SINGULAR_NAME}.dto.ts"
-echo "  - dto/update-${SINGULAR_NAME}.dto.ts"
-echo "  - models/${SINGULAR_NAME}.entity.ts"
-if [ "$NO_COMMANDS" = false ]; then
-    echo "  - commands/create-${SINGULAR_NAME}.command.ts"
-    echo "  - commands/create-${SINGULAR_NAME}.command.handler.ts"
-    echo "  - commands/update-${SINGULAR_NAME}.command.ts"
-    echo "  - commands/update-${SINGULAR_NAME}.command.handler.ts"
-    echo "  - commands/delete-${SINGULAR_NAME}.command.ts"
-    echo "  - commands/delete-${SINGULAR_NAME}.command.handler.ts"
-fi
-if [ "$NO_QUERIES" = false ]; then
-    echo "  - queries/get-${MODULE_NAME}.query.ts"
-    echo "  - queries/get-${MODULE_NAME}.query.handler.ts"
-    echo "  - queries/get-${SINGULAR_NAME}-by-id.query.ts"
-    echo "  - queries/get-${SINGULAR_NAME}-by-id.query.handler.ts"
-fi
-echo ""
-echo "Prochaine etape:"
-echo "  1. Importer ${MODULE_PASCAL}Module dans app.module.ts:"
-echo "     import { ${MODULE_PASCAL}Module } from './${MODULE_NAME}/${MODULE_NAME}.module';"
-echo ""
-echo "  2. Ajouter ${MODULE_PASCAL}Module dans le tableau imports de @Module"
-echo ""
-echo "============================================================"
+parse_args "$@"
+check_project
+create_directories
+create_model
+create_commands
+create_queries
+create_controller
+create_module
+show_instructions

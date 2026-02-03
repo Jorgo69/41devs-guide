@@ -1,137 +1,180 @@
-# setup-nestjs-cqrs.sh
+# setup-nestjs-cqrs.sh - Documentation
 
-Script d'installation automatique pour projets NestJS avec CQRS (41DEVS Standard).
+## 🚀 Description
 
-## Usage
+Script d'initialisation de projets NestJS avec le pattern CQRS selon le **Standard 41DEVS**.
+
+Cree par **Ibrahim** pour l'equipe 41DEVS.
+
+## 📦 Installation
 
 ```bash
-# Creer un nouveau projet dans un dossier
+# Ajouter les scripts au PATH (une seule fois)
+cd scripts
+bash install.sh
+source ~/.bashrc
+```
+
+## 🎯 Usage
+
+```bash
+# Creer un nouveau projet avec installation npm
 setup-nestjs-cqrs.sh mon-api
+
+# Creer sans installer les dependances (rapide/offline)
+setup-nestjs-cqrs.sh mon-api --no-install
+setup-nestjs-cqrs.sh mon-api -n
 
 # Initialiser dans le dossier actuel
 setup-nestjs-cqrs.sh .
 
-# Mode interactif (demande le nom)
+# Mode interactif
 setup-nestjs-cqrs.sh
 
-# Afficher l'aide
+# Aide
 setup-nestjs-cqrs.sh --help
 ```
 
-## Structure generee
+## 📁 Structure generee
 
 ```
 mon-api/
 ├── src/
-│   ├── main.ts                # Point d'entree avec Swagger
-│   ├── app.module.ts          # Module racine
-│   ├── app.controller.ts      # Controller de base
-│   ├── app.service.ts         # Service de base
-│   ├── app.controller.spec.ts # Test unitaire
 │   ├── config/
-│   ├── common/
-│   │   ├── decorators/
-│   │   ├── guards/
-│   │   ├── interceptors/
-│   │   ├── filters/
-│   │   ├── pipes/
-│   │   ├── middlewares/
-│   │   ├── interfaces/
-│   │   ├── enums/
-│   │   └── utils/
-│   ├── shared/
-│   │   ├── email/
-│   │   ├── sms/
-│   │   ├── storage/
-│   │   └── notification/
-│   └── health/                # Module exemple CQRS
-│       ├── health.module.ts
-│       ├── health.controller.ts
-│       └── queries/
-│           ├── get-health.query.ts
-│           └── get-health.query.handler.ts
-├── config/
-├── settings/
+│   │   ├── default.yml           # Configuration YAML
+│   │   └── configuration.ts      # Chargeur de config
+│   ├── auth/                      # Module Auth complet
+│   │   ├── auth.controller.ts
+│   │   ├── auth.module.ts
+│   │   ├── commands/
+│   │   │   ├── handlers/          # Logique metier
+│   │   │   │   ├── create-user.command.handler/
+│   │   │   │   └── login.command.handler/
+│   │   │   └── impl/              # Commands (DTO + validation)
+│   │   │       ├── create-user.command/
+│   │   │       └── login.command/
+│   │   ├── queries/
+│   │   │   ├── handlers/
+│   │   │   └── impl/
+│   │   ├── models/
+│   │   │   └── user.model/
+│   │   └── strategie/
+│   │       ├── jwt.strategy.ts
+│   │       └── jwt-auth.guard.ts
+│   ├── user/                      # Module User CRUD
+│   │   └── ...
+│   ├── health/                    # Module Health (exemple)
+│   │   └── ...
+│   ├── main.ts
+│   ├── app.module.ts
+│   ├── app.controller.ts
+│   ├── app.service.ts
+│   └── polyfill.ts
 ├── test/
-├── docs/adr/
-├── http/
-├── .env
-├── .env.example
 ├── .gitignore
 ├── .prettierrc
+├── .eslintrc.js
+├── nest-cli.json
 ├── tsconfig.json
-└── nest-cli.json
+├── tsconfig.build.json
+├── package.json
+└── README.md
 ```
 
-## Dependances installees
+## 🔐 Pattern CQRS 41DEVS
+
+### Commands (modifient l'etat)
+
+```
+commands/
+├── handlers/
+│   └── create-user.command.handler/
+│       └── create-user.command.handler.ts   # Logique
+└── impl/
+    └── create-user.command/
+        └── create-user.command.ts           # DTO + Validation + Swagger
+```
+
+### Queries (lecture seule)
+
+```
+queries/
+├── handlers/
+│   └── get-all.handler/
+│       └── get-all.handler.ts               # Logique
+└── impl/
+    └── get-all.query/
+        └── get-all.query.ts                 # DTO
+```
+
+## ⚙️ Configuration
+
+Le fichier `src/config/default.yml` remplace `.env`:
+
+```yaml
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  username: postgres
+  password: postgres
+  database: my_database
+  synchronize: true
+
+jwt:
+  secret: "CHANGE-ME-IN-PRODUCTION"
+  expireIn: "7d"
+
+server:
+  port: 3000
+```
+
+## 📦 Dependances
 
 ### Production
-| Package | Description |
-|---------|-------------|
-| @nestjs/common, core, platform-express | Core NestJS |
-| @nestjs/cqrs | Pattern CQRS |
-| @nestjs/typeorm, typeorm, pg | PostgreSQL |
-| @nestjs/config, dotenv | Configuration |
-| class-validator, class-transformer | Validation DTOs |
-| @nestjs/jwt, passport, bcrypt | Authentification |
-| @nestjs/swagger, swagger-ui-express | Documentation API |
-| nest-winston, winston | Logging |
-| uuid, rxjs, reflect-metadata | Utilitaires |
+- @nestjs/common, core, platform-express
+- @nestjs/cqrs
+- @nestjs/typeorm, typeorm, pg
+- @nestjs/config, js-yaml
+- @nestjs/jwt, @nestjs/passport, passport, passport-jwt, bcrypt
+- @nestjs/swagger
+- class-validator, class-transformer
+- rxjs, reflect-metadata
 
-### Developpement
-| Package | Description |
-|---------|-------------|
-| typescript, ts-node | TypeScript |
-| jest, ts-jest | Tests |
-| eslint, prettier | Linting/Formatting |
-| @nestjs/cli | CLI NestJS |
+### Dev
+- @nestjs/cli, schematics, testing
+- typescript, ts-node, ts-loader
+- jest, ts-jest, supertest
+- eslint, prettier
+- @types/*
 
-## Fichiers configures
-
-- **`.env`** : Variables PostgreSQL, JWT, etc.
-- **`tsconfig.json`** : Optimise pour NestJS
-- **`nest-cli.json`** : Configuration CLI
-- **`.prettierrc`** : Regles 41DEVS
-- **`.gitignore`** : Ignore node_modules, dist, .env
-
-## Module exemple: Health
-
-Le script cree un module `health` qui demontre le pattern CQRS :
-
-```typescript
-// GET /api/health
-{
-  "status": "ok",
-  "timestamp": "2026-02-02T18:00:00.000Z",
-  "uptime": 123.456,
-  "message": "API NestJS CQRS - 41DEVS Standard"
-}
-```
-
-## Apres l'installation
-
-```bash
-cd mon-api
-vim .env                  # Configurer la base de donnees
-npm run start:dev         # Lancer le serveur
-```
-
-## URLs
+## 🌐 URLs
 
 | URL | Description |
 |-----|-------------|
-| http://localhost:3000/api | Base API |
-| http://localhost:3000/api/docs | Swagger UI |
-| http://localhost:3000/api/health | Health check |
+| http://localhost:3000 | API Root |
+| http://localhost:3000/api | Swagger UI |
+| http://localhost:3000/health | Health Check |
 
-## Scripts npm
+## 🔧 Apres creation
 
 ```bash
-npm run start:dev    # Dev avec hot reload
-npm run start:debug  # Debug mode
-npm run start:prod   # Production
-npm run build        # Build
-npm run lint         # ESLint
-npm run test         # Tests Jest
-npm run test:cov     # Coverage
+cd mon-api
+
+# Si --no-install a ete utilise
+npm install
+
+# Configurer la base de donnees
+vim src/config/default.yml
+
+# Lancer
+npm run start:dev
 ```
+
+## 📝 Creer un nouveau module
+
+```bash
+generate-module.sh products
+```
+
+Voir [generate-module.md](generate-module.md)

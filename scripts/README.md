@@ -1,129 +1,114 @@
-# Scripts 41DEVS - NestJS CQRS
+# 🛠️ Scripts 41DEVS - NestJS CQRS
 
-Ensemble de scripts pour automatiser la creation et la gestion de projets NestJS suivant le pattern CQRS.
+> Outils de generation de projets et modules NestJS selon le **Standard 41DEVS**
+> 
+> Cree par **Ibrahim** pour l'equipe 41DEVS
 
-## Installation Globale
-
-Les scripts sont configures pour etre accessibles depuis n'importe quel dossier.
-Voir [INSTALLATION.md](./INSTALLATION.md) pour les details.
+## 📦 Installation rapide
 
 ```bash
-# Usage depuis n'importe ou
+cd scripts
+bash install.sh
+source ~/.bashrc
+```
+
+## 🚀 Scripts disponibles
+
+### setup-nestjs-cqrs.sh
+
+Cree un projet NestJS complet avec Auth, User, et Health modules.
+
+```bash
+# Creer un projet
+setup-nestjs-cqrs.sh mon-api
+
+# Sans npm install (rapide/offline)
+setup-nestjs-cqrs.sh mon-api --no-install
+
+# Dans le dossier actuel
+setup-nestjs-cqrs.sh .
+```
+
+👉 [Documentation complete](setup-nestjs-cqrs.md)
+
+---
+
+### generate-module.sh
+
+Genere un module CQRS complet dans un projet existant.
+
+```bash
+cd mon-api
 generate-module.sh products
-setup-nestjs-cqrs.sh
 ```
 
-## Contenu
+👉 [Documentation complete](generate-module.md)
 
-| Script | Description | Documentation |
-|--------|-------------|---------------|
-| `setup-nestjs-cqrs.sh` | Installation des dependances NestJS + CQRS | [setup-nestjs-cqrs.md](./setup-nestjs-cqrs.md) |
-| `generate-module.sh` | Generateur de modules CQRS | [generate-module.md](./generate-module.md) |
+---
 
-
-## Documentation Base de Donnees
-
-| Script | Description |
-|--------|-------------|
-| `setup-database.sql` | Creation de la base de donnees |
-| `drop-database.sql` | Suppression de la base de donnees |
-
-Voir [database.md](./database.md) pour plus de details.
-
-## Installation Rapide
-
-### 1. Creer un nouveau projet NestJS
-
-```bash
-nest new mon-projet
-cd mon-projet
-```
-
-### 2. Installer les dependances CQRS
-
-```bash
-../scripts/setup-nestjs-cqrs.sh
-```
-
-### 3. Configurer la base de donnees
-
-```bash
-sudo -u postgres psql -f setup-database.sql
-```
-
-### 4. Generer un module
-
-```bash
-../scripts/generate-module.sh products
-```
-
-### 5. Importer le module
-
-Ajouter dans `app.module.ts` :
-
-```typescript
-import { ProductsModule } from './products/products.module';
-
-@Module({
-  imports: [
-    // ... autres imports
-    ProductsModule,
-  ],
-})
-export class AppModule {}
-```
-
-### 6. Lancer le serveur
-
-```bash
-npm run start:dev
-```
-
-## Structure d'un Module Genere
+## 📁 Pattern CQRS 41DEVS
 
 ```
-src/<module>/
-├── <module>.module.ts
-├── <module>.controller.ts
-├── dto/
-│   ├── create-<entity>.dto.ts
-│   └── update-<entity>.dto.ts
+module/
+├── module.controller.ts
+├── module.module.ts
 ├── models/
-│   └── <entity>.entity.ts
+│   └── entity.model/
 ├── commands/
-│   ├── create-<entity>.command.ts
-│   ├── create-<entity>.command.handler.ts
-│   ├── update-<entity>.command.ts
-│   ├── update-<entity>.command.handler.ts
-│   ├── delete-<entity>.command.ts
-│   └── delete-<entity>.command.handler.ts
+│   ├── handlers/           # Logique metier
+│   │   └── create-entity.command.handler/
+│   └── impl/               # DTO + Validation + Swagger
+│       └── create-entity.command/
 └── queries/
-    ├── get-<entities>.query.ts
-    ├── get-<entities>.query.handler.ts
-    ├── get-<entity>-by-id.query.ts
-    └── get-<entity>-by-id.query.handler.ts
+    ├── handlers/
+    └── impl/
 ```
 
-## Endpoints API Generes
+**Points cles:**
+- Pas de DTOs separes - les Commands/Queries sont les DTOs
+- Configuration YAML (pas de .env)
+- Chaque handler dans son propre dossier
 
-| Methode | Endpoint | Description |
-|---------|----------|-------------|
-| GET | `/<module>` | Liste tous les elements |
-| GET | `/<module>/:id` | Recupere un element par ID |
-| POST | `/<module>` | Cree un nouvel element |
-| PATCH | `/<module>/:id` | Met a jour un element |
-| DELETE | `/<module>/:id` | Supprime un element (soft delete) |
+---
 
-## Compatibilite
+## 🔧 Configuration
 
-- Linux (Ubuntu, Debian, CentOS, etc.)
-- macOS
-- Windows (Git Bash, WSL)
+Les projets utilisent `src/config/default.yml`:
 
-## Auteur
+```yaml
+database:
+  host: localhost
+  port: 5432
+  username: postgres
+  password: postgres
+  database: my_database
 
-41DEVS
+jwt:
+  secret: "CHANGE-ME"
+  expireIn: "7d"
+```
 
-## Version
+---
 
-1.1.0
+## 📚 Documentation
+
+| Fichier | Description |
+|---------|-------------|
+| [setup-nestjs-cqrs.md](setup-nestjs-cqrs.md) | Creation de projets |
+| [generate-module.md](generate-module.md) | Generation de modules |
+| [INSTALLATION.md](INSTALLATION.md) | Configuration PATH |
+
+---
+
+## 🤝 Contribution
+
+Standard 41DEVS - Contributions bienvenues!
+
+1. Fork le repo
+2. Creer une branche
+3. Commit les changements
+4. Ouvrir une Pull Request
+
+---
+
+**MIT License** - Created by Ibrahim for 41DEVS

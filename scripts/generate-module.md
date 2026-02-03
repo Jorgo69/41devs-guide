@@ -1,125 +1,182 @@
-# Generate Module - Documentation
+# generate-module.sh - Documentation
 
-## Description
+## 🔧 Description
 
-Script de generation automatique de modules NestJS suivant le pattern CQRS et les conventions 41DEVS.
+Generateur de modules NestJS avec le pattern CQRS selon le **Standard 41DEVS**.
 
-## Emplacement
+Cree par **Ibrahim** pour l'equipe 41DEVS.
 
-```
-scripts/generate-module.sh
-```
-
-## Usage
+## 📦 Usage
 
 ```bash
-# Depuis le repertoire de votre projet NestJS
-../scripts/generate-module.sh <nom-module> [options]
+# Generer un module
+generate-module.sh <module-name>
 
-# Ou depuis n'importe ou avec le chemin complet
-/chemin/vers/scripts/generate-module.sh <nom-module> [options]
+# Exemples
+generate-module.sh products
+generate-module.sh order-items
+generate-module.sh Category
+
+# Aide
+generate-module.sh --help
 ```
 
-## Arguments
-
-| Argument | Description | Exemple |
-|----------|-------------|---------|
-| `nom-module` | Nom du module en kebab-case | `products`, `user-profiles` |
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--dry-run` | Affiche les fichiers qui seraient crees sans les creer |
-| `--no-queries` | Ne genere pas les fichiers de queries (GET) |
-| `--no-commands` | Ne genere pas les fichiers de commands (POST/PATCH/DELETE) |
-| `--force` | Ecrase le module s'il existe deja |
-| `-h, --help` | Affiche l'aide |
-
-## Exemples
+## 📁 Structure generee
 
 ```bash
-# Generer un module complet
-./generate-module.sh products
-
-# Voir ce qui serait cree sans rien creer
-./generate-module.sh products --dry-run
-
-# Generer un module sans les queries (lecture seule)
-./generate-module.sh products --no-queries
-
-# Ecraser un module existant
-./generate-module.sh products --force
+generate-module.sh products
 ```
 
-## Structure Generee
+Genere:
 
 ```
-src/<module>/
-├── <module>.module.ts           # Module NestJS
-├── <module>.controller.ts       # Controller REST
-├── dto/
-│   ├── create-<entity>.dto.ts   # DTO de creation
-│   └── update-<entity>.dto.ts   # DTO de mise a jour
+src/products/
+├── products.controller.ts
+├── products.module.ts
 ├── models/
-│   └── <entity>.entity.ts       # Entity TypeORM
+│   └── product.model/
+│       └── product.model.ts
 ├── commands/
-│   ├── create-<entity>.command.ts
-│   ├── create-<entity>.command.handler.ts
-│   ├── update-<entity>.command.ts
-│   ├── update-<entity>.command.handler.ts
-│   ├── delete-<entity>.command.ts
-│   └── delete-<entity>.command.handler.ts
+│   ├── handlers/
+│   │   ├── create-product.command.handler/
+│   │   │   └── create-product.command.handler.ts
+│   │   ├── update-product.command.handler/
+│   │   │   └── update-product.command.handler.ts
+│   │   └── delete-product.command.handler/
+│   │       └── delete-product.command.handler.ts
+│   └── impl/
+│       ├── create-product.command/
+│       │   └── create-product.command.ts
+│       ├── update-product.command/
+│       │   └── update-product.command.ts
+│       └── delete-product.command/
+│           └── delete-product.command.ts
 └── queries/
-    ├── get-<entities>.query.ts
-    ├── get-<entities>.query.handler.ts
-    ├── get-<entity>-by-id.query.ts
-    └── get-<entity>-by-id.query.handler.ts
+    ├── handlers/
+    │   ├── get-all.handler/
+    │   │   └── get-all.handler.ts
+    │   └── find-by-id.handler/
+    │       └── find-by-id.handler.ts
+    └── impl/
+        ├── get-all.query/
+        │   └── get-all.query.ts
+        └── find-by-id.query/
+            └── find-by-id.query.ts
 ```
 
-## Conventions de Nommage
+## 🔐 Pattern Handler/Impl
 
-Le script convertit automatiquement les noms :
+### impl/ - Definition de la Command/Query
 
-| Entree | Transformation | Resultat |
-|--------|---------------|----------|
-| `products` | Pluriel kebab-case | `products` |
-| `products` | Singulier kebab-case | `product` |
-| `products` | Pluriel PascalCase | `Products` |
-| `products` | Singulier PascalCase | `Product` |
-| `user-profiles` | Singulier PascalCase | `UserProfile` |
-
-## Apres la Generation
-
-1. **Importer le module** dans `app.module.ts` :
+Contient les decorateurs de validation et Swagger:
 
 ```typescript
+// commands/impl/create-product.command/create-product.command.ts
+import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsString } from 'class-validator';
+
+export class CreateProductCommand {
+  @ApiProperty({ description: 'Name', example: 'My Product' })
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+}
+```
+
+### handlers/ - Logique metier
+
+```typescript
+// commands/handlers/create-product.command.handler/create-product.command.handler.ts
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CreateProductCommand } from '../../impl/create-product.command/create-product.command';
+
+@CommandHandler(CreateProductCommand)
+export class CreateProductCommandHandler implements ICommandHandler<CreateProductCommand> {
+  async execute(command: CreateProductCommand): Promise<any> {
+    // Logique de creation
+  }
+}
+```
+
+## ⚠️ Actions requises apres generation
+
+### 1. Ajouter le module dans app.module.ts
+
+```typescript
+// Imports
 import { ProductsModule } from './products/products.module';
+import { ProductModel } from './products/models/product.model/product.model';
 
 @Module({
   imports: [
-    // ... autres imports
-    ProductsModule,
+    // ...
+    TypeOrmModule.forRootAsync({
+      // ...
+      useFactory: async (configService: ConfigService) => ({
+        // ...
+        entities: [
+          UserModel,
+          ProductModel,  // Ajouter ici
+        ],
+      }),
+    }),
+    // Modules
+    AuthModule,
+    UserModule,
+    HealthModule,
+    ProductsModule,  // Ajouter ici
   ],
 })
 export class AppModule {}
 ```
 
-2. **Personnaliser l'entity** selon vos besoins (ajouter des champs)
+### 2. Personnaliser le Model
 
-3. **Tester l'API** avec les endpoints generes :
-   - `GET /<module>` - Liste tous les elements
-   - `GET /<module>/:id` - Recupere un element
-   - `POST /<module>` - Cree un element
-   - `PATCH /<module>/:id` - Met a jour un element
-   - `DELETE /<module>/:id` - Supprime un element (soft delete)
+```typescript
+// src/products/models/product.model/product.model.ts
+@Entity('products')
+export class ProductModel {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-## Compatibilite
+  @Column()
+  name: string;
 
-- Linux (Ubuntu, Debian, etc.)
-- macOS
-- Windows (Git Bash, WSL)
+  @Column({ nullable: true })
+  description: string;
 
-## Version
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  price: number;  // Ajouter des champs
 
-1.1.0
+  @Column({ default: 0 })
+  stock: number;
+}
+```
+
+### 3. Mettre a jour les Commands
+
+Ajouter les nouveaux champs dans les commands/impl.
+
+## 🎯 Endpoints generes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /products | Create |
+| GET | /products | Get all |
+| GET | /products/by-id?id=xxx | Get by ID |
+| PUT | /products | Update |
+| DELETE | /products | Delete |
+
+## 📝 Exemples complets
+
+```bash
+# Module pour un blog
+generate-module.sh posts
+generate-module.sh comments
+generate-module.sh categories
+
+# Module pour e-commerce
+generate-module.sh products
+generate-module.sh orders
+generate-module.sh customers
+```
