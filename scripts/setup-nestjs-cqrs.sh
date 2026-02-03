@@ -161,51 +161,51 @@ create_package_json() {
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
-    "@nestjs/config": "^4.0.0",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^10.0.0",
-    "@nestjs/cqrs": "^11.0.0",
+    "@nestjs/cqrs": "^11.0.3",
     "@nestjs/jwt": "^11.0.0",
-    "@nestjs/passport": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.0.0",
-    "@nestjs/swagger": "^11.0.0",
-    "@nestjs/typeorm": "^10.0.0",
-    "bcrypt": "^5.0.0",
-    "class-transformer": "^0.5.0",
-    "class-validator": "^0.14.0",
+    "@nestjs/swagger": "^11.2.0",
+    "@nestjs/typeorm": "^9.0.1",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
     "js-yaml": "^4.1.0",
     "passport": "^0.7.0",
-    "passport-jwt": "^4.0.0",
-    "pg": "^8.0.0",
+    "passport-jwt": "^4.0.1",
+    "pg": "^8.16.3",
     "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.0",
-    "typeorm": "^0.3.0"
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.25"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.0.0",
+    "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
-    "@types/bcrypt": "^5.0.0",
-    "@types/express": "^4.17.0",
-    "@types/jest": "^29.0.0",
-    "@types/js-yaml": "^4.0.0",
-    "@types/node": "^20.0.0",
-    "@types/passport": "^1.0.0",
-    "@types/passport-jwt": "^4.0.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.2",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.3.1",
+    "@types/passport": "^1.0.17",
+    "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
-    "jest": "^29.0.0",
+    "jest": "^29.5.0",
     "prettier": "^3.0.0",
-    "source-map-support": "^0.5.0",
+    "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
-    "ts-jest": "^29.0.0",
-    "ts-loader": "^9.0.0",
-    "ts-node": "^10.0.0",
-    "tsconfig-paths": "^4.0.0",
-    "typescript": "^5.0.0"
+    "ts-jest": "^29.1.0",
+    "ts-loader": "^9.4.3",
+    "ts-node": "^10.9.1",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.1.3"
   },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],
@@ -552,8 +552,8 @@ async function bootstrap() {
   console.log('╔══════════════════════════════════════════════════════════════╗');
   console.log('║          🚀 API READY - Standard 41DEVS                      ║');
   console.log('╚══════════════════════════════════════════════════════════════╝');
-  console.log(\`📍 Server:  http://localhost:\${port}\`);
-  console.log(\`📚 Swagger: http://localhost:\${port}/api\`);
+  console.log(`📍 Server:  http://localhost:${port}`);
+  console.log(`📚 Swagger: http://localhost:${port}/api`);
   console.log('');
 }
 bootstrap();
@@ -946,8 +946,9 @@ export class LoginCommandHandler implements ICommandHandler<LoginCommand> {
 
       // Generer le token JWT
       const payload = { sub: user.id, email: user.email };
+      const expiresIn = this.configService.get<string>('jwt.expireIn') || '7d';
       const token = this.jwtService.sign(payload, {
-        expiresIn: this.configService.get<string>('jwt.expireIn') || '7d',
+        expiresIn: expiresIn as any,
         secret: this.configService.get<string>('jwt.secret'),
       });
 
@@ -1103,7 +1104,7 @@ EOF
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { GetAllQuery } from '../../impl/get-all.query/get-all.query';
 import { DataSource } from 'typeorm';
-import { UserModel } from '../../../auth/models/user.model/user.model';
+import { UserModel } from '../../../../auth/models/user.model/user.model';
 
 @QueryHandler(GetAllQuery)
 export class GetAllHandler implements IQueryHandler<GetAllQuery> {
@@ -1145,7 +1146,7 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { FindByIdQuery } from '../../impl/find-by-id.query/find-by-id.query';
 import { DataSource } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
-import { UserModel } from '../../../auth/models/user.model/user.model';
+import { UserModel } from '../../../../auth/models/user.model/user.model';
 
 @QueryHandler(FindByIdQuery)
 export class FindByIdHandler implements IQueryHandler<FindByIdQuery> {
@@ -1196,7 +1197,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { UpdateUserCommand } from '../../impl/update-user.command/update-user.command';
 import { DataSource } from 'typeorm';
 import { Logger, NotFoundException } from '@nestjs/common';
-import { UserModel } from '../../../auth/models/user.model/user.model';
+import { UserModel } from '../../../../auth/models/user.model/user.model';
 
 @CommandHandler(UpdateUserCommand)
 export class UpdateUserCommandHandler implements ICommandHandler<UpdateUserCommand> {
@@ -1247,7 +1248,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { DeleteUserCommand } from '../../impl/delete-user.command/delete-user.command';
 import { DataSource } from 'typeorm';
 import { Logger, NotFoundException } from '@nestjs/common';
-import { UserModel } from '../../../auth/models/user.model/user.model';
+import { UserModel } from '../../../../auth/models/user.model/user.model';
 
 @CommandHandler(DeleteUserCommand)
 export class DeleteUserCommandHandler implements ICommandHandler<DeleteUserCommand> {
@@ -1611,12 +1612,12 @@ install_dependencies() {
     if [ "$SKIP_INSTALL" = true ]; then
         echo ""
         echo -e "${YELLOW}⏭️ Installation npm ignoree (--no-install)${NC}"
-        echo -e "${YELLOW}   Executez 'npm install' manuellement${NC}"
+        echo -e "${YELLOW}   Executez 'npm install --legacy-peer-deps' manuellement${NC}"
     else
         echo ""
         echo -e "${BLUE}📦 Installation des dependances npm...${NC}"
         cd "$PROJECT_DIR"
-        npm install
+        npm install --legacy-peer-deps
     fi
 }
 

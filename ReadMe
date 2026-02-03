@@ -1,0 +1,9 @@
+# Creer un projet
+setup-nestjs-cqrs.sh mon-api
+
+# Sans npm install
+setup-nestjs-cqrs.sh mon-api --no-install
+
+# Generer un module
+cd mon-api
+generate-module.sh products
