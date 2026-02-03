@@ -101,9 +101,15 @@ setup_project_dir() {
             mkdir -p "$PROJECT_DIR"
         fi
     else
-        echo -e "${YELLOW}📝 Mode interactif${NC}"
-        read -p "Nom du projet (defaut: my-nest-app): " input_name
-        PROJECT_NAME="${input_name:-my-nest-app}"
+        # Mode interactif
+        echo -e "${YELLOW}Entrez le nom du projet:${NC}"
+        read -r PROJECT_NAME
+        
+        if [[ -z "$PROJECT_NAME" ]]; then
+            echo -e "${RED}❌ Erreur: Le nom du projet est requis.${NC}"
+            exit 1
+        fi
+        
         PROJECT_DIR="$(pwd)/$PROJECT_NAME"
         
         if [[ -d "$PROJECT_DIR" ]]; then
@@ -111,7 +117,8 @@ setup_project_dir() {
             exit 1
         fi
         
-        read -p "Installer les dependances npm? (O/n): " install_choice
+        echo -e "${YELLOW}Installer les dependances npm? (O/n)${NC}"
+        read -r install_choice
         if [[ "$install_choice" =~ ^[Nn]$ ]]; then
             SKIP_INSTALL=true
         fi
@@ -119,6 +126,9 @@ setup_project_dir() {
         echo -e "${BLUE}📁 Creation du dossier: $PROJECT_DIR${NC}"
         mkdir -p "$PROJECT_DIR"
     fi
+    
+    # Generer le nom de la base de donnees (remplacer - par _)
+    DB_NAME="${PROJECT_NAME//-/_}"
 }
 
 # --- Afficher le header ---
@@ -157,7 +167,10 @@ create_package_json() {
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "db:setup": "sudo -u postgres psql -f database/setup-database.sql",
+    "db:drop": "sudo -u postgres psql -f database/drop-database.sql",
+    "db:reset": "npm run db:drop && npm run db:setup"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -400,19 +413,20 @@ create_config_files() {
     echo -e "${BLUE}⚙️ Creation des fichiers de configuration...${NC}"
     
     # default.yml
-    cat > "$PROJECT_DIR/src/config/default.yml" << 'EOF'
+    cat > "$PROJECT_DIR/src/config/default.yml" << EOF
 # ============================================================
 # Configuration - Standard 41DEVS
 # ============================================================
 # Modifier ces valeurs selon votre environnement
+# Base de donnees: $DB_NAME
 
 database:
   type: postgres
   host: localhost
   port: 5432
-  username: postgres
-  password: postgres
-  database: my_database
+  username: root
+  password: root
+  database: $DB_NAME
   synchronize: true    # Mettre a false en production!
   logging: true
 
@@ -1525,6 +1539,28 @@ queries/
 | `npm run start:prod` | Production |
 | `npm run lint` | ESLint |
 | `npm run test` | Tests Jest |
+| `npm run db:setup` | Creer la base de donnees |
+| `npm run db:drop` | Supprimer la base de donnees |
+| `npm run db:reset` | Reset complet (drop + setup) |
+
+## 🗄️ Base de donnees
+
+### Premier demarrage
+
+```bash
+# 1. Creer la base de donnees PostgreSQL
+npm run db:setup
+
+# 2. Lancer l'application
+npm run start:dev
+```
+
+### Reset complet (comme Laravel migrate:fresh)
+
+```bash
+npm run db:reset
+npm run start:dev
+```
 
 ## ⚙️ Configuration
 
@@ -1534,9 +1570,9 @@ Editer `src/config/default.yml`:
 database:
   host: localhost
   port: 5432
-  username: postgres
-  password: postgres
-  database: my_database
+  username: root
+  password: root
+  database: my_project_name
 
 jwt:
   secret: "CHANGE-ME-IN-PRODUCTION"
@@ -1560,6 +1596,82 @@ generate-module.sh products
 ## 📝 License
 
 MIT - Created by Ibrahim for 41DEVS
+EOF
+}
+
+# --- Creer les scripts de base de donnees ---
+create_database_scripts() {
+    echo -e "${BLUE}🗄️ Creation des scripts de base de donnees...${NC}"
+    
+    mkdir -p "$PROJECT_DIR/database"
+    
+    # setup-database.sql
+    cat > "$PROJECT_DIR/database/setup-database.sql" << EOF
+-- ============================================================
+-- 🗄️ Script de creation de la base de donnees PostgreSQL
+-- ============================================================
+-- Executer avec: npm run db:setup
+-- Ou: sudo -u postgres psql -f database/setup-database.sql
+-- ============================================================
+
+-- 1. Creer l'utilisateur root avec SUPERUSER (pour dev uniquement!)
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'root') THEN
+        CREATE USER root WITH PASSWORD 'root' SUPERUSER CREATEDB;
+    ELSE
+        -- Si l'utilisateur existe deja, lui donner SUPERUSER
+        ALTER USER root WITH SUPERUSER;
+    END IF;
+END
+\$\$;
+
+-- 2. Supprimer la base si elle existe
+DROP DATABASE IF EXISTS $DB_NAME;
+
+-- 3. Creer la base de donnees
+CREATE DATABASE $DB_NAME OWNER root;
+
+-- 4. Se connecter a la base $DB_NAME
+\\c $DB_NAME
+
+-- 5. Changer le proprietaire du schema public
+ALTER SCHEMA public OWNER TO root;
+
+-- ============================================================
+-- ✅ Configuration terminee !
+-- 🚀 Lancer: npm run start:dev
+-- ============================================================
+EOF
+
+    # drop-database.sql
+    cat > "$PROJECT_DIR/database/drop-database.sql" << EOF
+-- ============================================================
+-- 🗑️ Script de suppression de la base de donnees PostgreSQL
+-- ============================================================
+-- Executer avec: npm run db:drop
+-- Ou: sudo -u postgres psql -f database/drop-database.sql
+-- ⚠️  ATTENTION: Cette action est irreversible !
+-- ============================================================
+
+-- Fermer toutes les connexions actives a la base
+SELECT
+    pg_terminate_backend (pg_stat_activity.pid)
+FROM
+    pg_stat_activity
+WHERE
+    pg_stat_activity.datname = '$DB_NAME'
+    AND pid <> pg_backend_pid ();
+
+-- Supprimer la base de donnees
+DROP DATABASE IF EXISTS $DB_NAME;
+
+-- ============================================================
+-- ✅ Base de donnees supprimee avec succes
+-- 
+-- 🔄 Pour recreer la base, executer:
+--    npm run db:setup
+-- ============================================================
 EOF
 }
 
@@ -1674,6 +1786,7 @@ create_auth_module
 create_user_module
 create_health_module
 create_readme
+create_database_scripts
 create_test_files
 
 install_dependencies

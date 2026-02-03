@@ -1,8 +1,17 @@
-# Creer un projet
+# Creer un projet (avec install)
 setup-nestjs-cqrs.sh mon-api
 
-# Sans npm install
+# Ou sans install (plus rapide)
 setup-nestjs-cqrs.sh mon-api --no-install
+cd mon-api
+npm install --legacy-peer-deps
+
+# Configurer la base de donnees
+vim src/config/default.yml
+
+# Lancer
+npm run start:dev
+
 
 # Generer un module
 cd mon-api
