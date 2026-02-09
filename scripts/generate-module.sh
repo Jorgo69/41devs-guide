@@ -33,6 +33,8 @@ MODULE_NAME_LOWER=""
 MODULE_NAME_UPPER=""
 MODULE_NAME_PASCAL=""
 ENTITY_NAME=""
+SUBDIR_PATH=""
+PROJECT_ROOT=""
 
 # --- Afficher l'aide ---
 show_help() {
@@ -48,6 +50,8 @@ show_help() {
     echo "  generate-module.sh products"
     echo "  generate-module.sh order-items"
     echo "  generate-module.sh Category"
+    echo "  generate-module.sh sub/admin         # Cree src/sub/admin/"
+    echo "  generate-module.sh features/billing  # Cree src/features/billing/"
     echo ""
     echo -e "${YELLOW}Structure generee:${NC}"
     echo "  src/<module>/"
@@ -100,41 +104,86 @@ parse_args() {
         exit 0
     fi
     
-    MODULE_NAME="$1"
+    local input="$1"
+    
+    # Si l'input contient un /, on a un sous-dossier
+    if [[ "$input" == *"/"* ]]; then
+        # Extraire le chemin du sous-dossier (tout sauf le dernier element)
+        SUBDIR_PATH=$(dirname "$input")
+        # Extraire le nom du module (dernier element)
+        MODULE_NAME=$(basename "$input")
+    else
+        SUBDIR_PATH=""
+        MODULE_NAME="$input"
+    fi
+    
     convert_names
+}
+
+# --- Trouver la racine du projet NestJS ---
+find_project_root() {
+    local current_dir="$PWD"
+    
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -f "$current_dir/package.json" ]] && [[ -d "$current_dir/src" ]]; then
+            PROJECT_ROOT="$current_dir"
+            return 0
+        fi
+        current_dir=$(dirname "$current_dir")
+    done
+    
+    return 1
 }
 
 # --- Verifier qu'on est dans un projet NestJS ---
 check_project() {
-    if [[ ! -f "package.json" ]] || [[ ! -d "src" ]]; then
-        echo -e "${RED}❌ Erreur: Vous devez etre dans un projet NestJS${NC}"
-        echo -e "${YELLOW}   Verifiez que package.json et src/ existent${NC}"
-        exit 1
+    # D'abord essayer le repertoire courant
+    if [[ -f "package.json" ]] && [[ -d "src" ]]; then
+        PROJECT_ROOT="$PWD"
+        return 0
     fi
+    
+    # Sinon, chercher dans les repertoires parents
+    if find_project_root; then
+        echo -e "${YELLOW}📍 Projet trouve: $PROJECT_ROOT${NC}"
+        return 0
+    fi
+    
+    echo -e "${RED}❌ Erreur: Impossible de trouver un projet NestJS${NC}"
+    echo -e "${YELLOW}   Verifiez que package.json et src/ existent${NC}"
+    echo -e "${YELLOW}   Vous pouvez executer ce script depuis n'importe quel sous-dossier du projet${NC}"
+    exit 1
 }
 
 # --- Creer la structure de dossiers ---
 create_directories() {
-    echo -e "${BLUE}📁 Creation de la structure pour ${MODULE_NAME_PASCAL}...${NC}"
+    # Construire le chemin de base
+    if [[ -n "$SUBDIR_PATH" ]]; then
+        BASE_PATH="${PROJECT_ROOT}/src/${SUBDIR_PATH}/${MODULE_NAME_LOWER}"
+        echo -e "${BLUE}📁 Creation de la structure pour ${MODULE_NAME_PASCAL} dans src/${SUBDIR_PATH}/...${NC}"
+    else
+        BASE_PATH="${PROJECT_ROOT}/src/${MODULE_NAME_LOWER}"
+        echo -e "${BLUE}📁 Creation de la structure pour ${MODULE_NAME_PASCAL}...${NC}"
+    fi
     
-    mkdir -p "src/$MODULE_NAME_LOWER/models/${ENTITY_NAME}.model"
-    mkdir -p "src/$MODULE_NAME_LOWER/commands/handlers/create-${ENTITY_NAME}.command.handler"
-    mkdir -p "src/$MODULE_NAME_LOWER/commands/handlers/update-${ENTITY_NAME}.command.handler"
-    mkdir -p "src/$MODULE_NAME_LOWER/commands/handlers/delete-${ENTITY_NAME}.command.handler"
-    mkdir -p "src/$MODULE_NAME_LOWER/commands/impl/create-${ENTITY_NAME}.command"
-    mkdir -p "src/$MODULE_NAME_LOWER/commands/impl/update-${ENTITY_NAME}.command"
-    mkdir -p "src/$MODULE_NAME_LOWER/commands/impl/delete-${ENTITY_NAME}.command"
-    mkdir -p "src/$MODULE_NAME_LOWER/queries/handlers/get-all.handler"
-    mkdir -p "src/$MODULE_NAME_LOWER/queries/handlers/find-by-id.handler"
-    mkdir -p "src/$MODULE_NAME_LOWER/queries/impl/get-all.query"
-    mkdir -p "src/$MODULE_NAME_LOWER/queries/impl/find-by-id.query"
+    mkdir -p "${BASE_PATH}/models/${ENTITY_NAME}.model"
+    mkdir -p "${BASE_PATH}/commands/handlers/create-${ENTITY_NAME}.command.handler"
+    mkdir -p "${BASE_PATH}/commands/handlers/update-${ENTITY_NAME}.command.handler"
+    mkdir -p "${BASE_PATH}/commands/handlers/delete-${ENTITY_NAME}.command.handler"
+    mkdir -p "${BASE_PATH}/commands/impl/create-${ENTITY_NAME}.command"
+    mkdir -p "${BASE_PATH}/commands/impl/update-${ENTITY_NAME}.command"
+    mkdir -p "${BASE_PATH}/commands/impl/delete-${ENTITY_NAME}.command"
+    mkdir -p "${BASE_PATH}/queries/handlers/get-all.handler"
+    mkdir -p "${BASE_PATH}/queries/handlers/find-by-id.handler"
+    mkdir -p "${BASE_PATH}/queries/impl/get-all.query"
+    mkdir -p "${BASE_PATH}/queries/impl/find-by-id.query"
 }
 
 # --- Creer le Model ---
 create_model() {
     echo -e "${BLUE}📄 Creation du Model ${ENTITY_PASCAL}...${NC}"
     
-    cat > "src/$MODULE_NAME_LOWER/models/${ENTITY_NAME}.model/${ENTITY_NAME}.model.ts" << EOF
+    cat > "${BASE_PATH}/models/${ENTITY_NAME}.model/${ENTITY_NAME}.model.ts" << EOF
 /**
  * ${ENTITY_PASCAL} Entity Model - Standard 41DEVS
  */
@@ -171,7 +220,7 @@ create_commands() {
     echo -e "${BLUE}📄 Creation des Commands...${NC}"
     
     # Create Command (impl)
-    cat > "src/$MODULE_NAME_LOWER/commands/impl/create-${ENTITY_NAME}.command/create-${ENTITY_NAME}.command.ts" << EOF
+    cat > "${BASE_PATH}/commands/impl/create-${ENTITY_NAME}.command/create-${ENTITY_NAME}.command.ts" << EOF
 /**
  * Create ${ENTITY_PASCAL} Command - Standard 41DEVS
  */
@@ -199,7 +248,7 @@ export class Create${ENTITY_PASCAL}Command {
 EOF
 
     # Create Command Handler
-    cat > "src/$MODULE_NAME_LOWER/commands/handlers/create-${ENTITY_NAME}.command.handler/create-${ENTITY_NAME}.command.handler.ts" << EOF
+    cat > "${BASE_PATH}/commands/handlers/create-${ENTITY_NAME}.command.handler/create-${ENTITY_NAME}.command.handler.ts" << EOF
 /**
  * Create ${ENTITY_PASCAL} Command Handler - Standard 41DEVS
  */
@@ -237,7 +286,7 @@ export class Create${ENTITY_PASCAL}CommandHandler implements ICommandHandler<Cre
 EOF
 
     # Update Command (impl)
-    cat > "src/$MODULE_NAME_LOWER/commands/impl/update-${ENTITY_NAME}.command/update-${ENTITY_NAME}.command.ts" << EOF
+    cat > "${BASE_PATH}/commands/impl/update-${ENTITY_NAME}.command/update-${ENTITY_NAME}.command.ts" << EOF
 /**
  * Update ${ENTITY_PASCAL} Command - Standard 41DEVS
  */
@@ -272,7 +321,7 @@ export class Update${ENTITY_PASCAL}Command {
 EOF
 
     # Update Command Handler
-    cat > "src/$MODULE_NAME_LOWER/commands/handlers/update-${ENTITY_NAME}.command.handler/update-${ENTITY_NAME}.command.handler.ts" << EOF
+    cat > "${BASE_PATH}/commands/handlers/update-${ENTITY_NAME}.command.handler/update-${ENTITY_NAME}.command.handler.ts" << EOF
 /**
  * Update ${ENTITY_PASCAL} Command Handler - Standard 41DEVS
  */
@@ -309,7 +358,7 @@ export class Update${ENTITY_PASCAL}CommandHandler implements ICommandHandler<Upd
 EOF
 
     # Delete Command (impl)
-    cat > "src/$MODULE_NAME_LOWER/commands/impl/delete-${ENTITY_NAME}.command/delete-${ENTITY_NAME}.command.ts" << EOF
+    cat > "${BASE_PATH}/commands/impl/delete-${ENTITY_NAME}.command/delete-${ENTITY_NAME}.command.ts" << EOF
 /**
  * Delete ${ENTITY_PASCAL} Command - Standard 41DEVS
  */
@@ -328,7 +377,7 @@ export class Delete${ENTITY_PASCAL}Command {
 EOF
 
     # Delete Command Handler
-    cat > "src/$MODULE_NAME_LOWER/commands/handlers/delete-${ENTITY_NAME}.command.handler/delete-${ENTITY_NAME}.command.handler.ts" << EOF
+    cat > "${BASE_PATH}/commands/handlers/delete-${ENTITY_NAME}.command.handler/delete-${ENTITY_NAME}.command.handler.ts" << EOF
 /**
  * Delete ${ENTITY_PASCAL} Command Handler - Standard 41DEVS
  */
@@ -367,7 +416,7 @@ create_queries() {
     echo -e "${BLUE}📄 Creation des Queries...${NC}"
     
     # Get All Query (impl)
-    cat > "src/$MODULE_NAME_LOWER/queries/impl/get-all.query/get-all.query.ts" << EOF
+    cat > "${BASE_PATH}/queries/impl/get-all.query/get-all.query.ts" << EOF
 /**
  * Get All ${MODULE_NAME_PASCAL} Query - Standard 41DEVS
  */
@@ -375,7 +424,7 @@ export class GetAll${MODULE_NAME_PASCAL}Query {}
 EOF
 
     # Get All Handler
-    cat > "src/$MODULE_NAME_LOWER/queries/handlers/get-all.handler/get-all.handler.ts" << EOF
+    cat > "${BASE_PATH}/queries/handlers/get-all.handler/get-all.handler.ts" << EOF
 /**
  * Get All ${MODULE_NAME_PASCAL} Handler - Standard 41DEVS
  */
@@ -395,7 +444,7 @@ export class GetAll${MODULE_NAME_PASCAL}Handler implements IQueryHandler<GetAll$
 EOF
 
     # Find By Id Query (impl)
-    cat > "src/$MODULE_NAME_LOWER/queries/impl/find-by-id.query/find-by-id.query.ts" << EOF
+    cat > "${BASE_PATH}/queries/impl/find-by-id.query/find-by-id.query.ts" << EOF
 /**
  * Find ${ENTITY_PASCAL} By Id Query - Standard 41DEVS
  */
@@ -414,7 +463,7 @@ export class Find${ENTITY_PASCAL}ByIdQuery {
 EOF
 
     # Find By Id Handler
-    cat > "src/$MODULE_NAME_LOWER/queries/handlers/find-by-id.handler/find-by-id.handler.ts" << EOF
+    cat > "${BASE_PATH}/queries/handlers/find-by-id.handler/find-by-id.handler.ts" << EOF
 /**
  * Find ${ENTITY_PASCAL} By Id Handler - Standard 41DEVS
  */
@@ -447,7 +496,7 @@ EOF
 create_controller() {
     echo -e "${BLUE}📄 Creation du Controller...${NC}"
     
-    cat > "src/$MODULE_NAME_LOWER/${MODULE_NAME_LOWER}.controller.ts" << EOF
+    cat > "${BASE_PATH}/${MODULE_NAME_LOWER}.controller.ts" << EOF
 /**
  * ${MODULE_NAME_PASCAL} Controller - Standard 41DEVS
  */
@@ -505,7 +554,7 @@ EOF
 create_module() {
     echo -e "${BLUE}📄 Creation du Module...${NC}"
     
-    cat > "src/$MODULE_NAME_LOWER/${MODULE_NAME_LOWER}.module.ts" << EOF
+    cat > "${BASE_PATH}/${MODULE_NAME_LOWER}.module.ts" << EOF
 /**
  * ${MODULE_NAME_PASCAL} Module - Standard 41DEVS
  */
@@ -546,13 +595,24 @@ EOF
 
 # --- Afficher les instructions ---
 show_instructions() {
+    # Construire le chemin pour l'affichage
+    local display_path
+    local import_path
+    if [[ -n "$SUBDIR_PATH" ]]; then
+        display_path="src/${SUBDIR_PATH}/${MODULE_NAME_LOWER}"
+        import_path="./${SUBDIR_PATH}/${MODULE_NAME_LOWER}"
+    else
+        display_path="src/${MODULE_NAME_LOWER}"
+        import_path="./${MODULE_NAME_LOWER}"
+    fi
+    
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║          ✨ MODULE ${MODULE_NAME_PASCAL} CREE!                          ${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "${YELLOW}📁 Structure creee:${NC}"
-    echo "   src/$MODULE_NAME_LOWER/"
+    echo "   ${display_path}/"
     echo "   ├── ${MODULE_NAME_LOWER}.controller.ts"
     echo "   ├── ${MODULE_NAME_LOWER}.module.ts"
     echo "   ├── models/${ENTITY_NAME}.model/"
@@ -563,7 +623,7 @@ show_instructions() {
     echo ""
     echo "1. Ajouter le module dans app.module.ts:"
     echo ""
-    echo -e "   ${CYAN}import { ${MODULE_NAME_PASCAL}Module } from './${MODULE_NAME_LOWER}/${MODULE_NAME_LOWER}.module';${NC}"
+    echo -e "   ${CYAN}import { ${MODULE_NAME_PASCAL}Module } from '${import_path}/${MODULE_NAME_LOWER}.module';${NC}"
     echo ""
     echo "   Et dans imports: ["
     echo -e "     ${CYAN}${MODULE_NAME_PASCAL}Module,${NC}"
@@ -571,7 +631,7 @@ show_instructions() {
     echo ""
     echo "2. Ajouter l'entity dans TypeOrmModule (app.module.ts):"
     echo ""
-    echo -e "   ${CYAN}import { ${ENTITY_PASCAL}Model } from './${MODULE_NAME_LOWER}/models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';${NC}"
+    echo -e "   ${CYAN}import { ${ENTITY_PASCAL}Model } from '${import_path}/models/${ENTITY_NAME}.model/${ENTITY_NAME}.model';${NC}"
     echo ""
     echo "   entities: ["
     echo -e "     ${CYAN}${ENTITY_PASCAL}Model,${NC}"
